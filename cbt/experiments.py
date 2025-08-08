@@ -13,6 +13,26 @@ from .model import CBTModel
 from .evaluation import CBTEvaluator
 
 
+def _json_serializable(obj):
+    """Convert object to JSON serializable format."""
+    if isinstance(obj, (np.integer, np.floating, np.bool_)):
+        return obj.item()
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, torch.Tensor):
+        return obj.detach().cpu().numpy().tolist()
+    elif isinstance(obj, dict):
+        return {k: _json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_json_serializable(item) for item in obj]
+    elif isinstance(obj, bool):
+        return obj
+    elif isinstance(obj, (int, float, str)):
+        return obj
+    else:
+        return str(obj)
+
+
 def get_wikitext_eval_texts(num_samples: int = 20) -> List[str]:
     """Get evaluation texts from WikiText dataset."""
     try:
@@ -108,7 +128,7 @@ def run_granularity_sweep(
     
     # Save results
     with open(save_path, 'w') as f:
-        json.dump(sweep_results, f, indent=2)
+        json.dump(_json_serializable(sweep_results), f, indent=2)
     
     print(f"\nSweep results saved to {save_path}")
     return sweep_results
@@ -173,7 +193,7 @@ def run_placement_study(
     
     # Save results
     with open(save_path, 'w') as f:
-        json.dump(placement_results, f, indent=2)
+        json.dump(_json_serializable(placement_results), f, indent=2)
     
     print(f"\nPlacement study results saved to {save_path}")
     return placement_results
@@ -249,7 +269,7 @@ def run_cross_seed_stability_test(
     
     # Save results
     with open(save_path, 'w') as f:
-        json.dump(results, f, indent=2)
+        json.dump(_json_serializable(results), f, indent=2)
     
     print(f"\nCross-seed stability results saved to {save_path}")
     return results 

@@ -8,6 +8,7 @@ import os
 import sys
 import json
 import torch
+import logging
 from datetime import datetime
 from datasets import load_dataset
 from torch.utils.data import DataLoader, Dataset
@@ -15,6 +16,44 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
 # Add the parent directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# -----------------------------------------------------------------------------
+# Logging setup
+# -----------------------------------------------------------------------------
+LOGGER_NAME = "cbt.trained_experiments"
+logger = logging.getLogger(LOGGER_NAME)
+if not logger.handlers:
+    logger.setLevel(logging.INFO)
+    _stream_handler = logging.StreamHandler(sys.stdout)
+    _stream_handler.setLevel(logging.INFO)
+    _formatter = logging.Formatter(
+        fmt="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    _stream_handler.setFormatter(_formatter)
+    logger.addHandler(_stream_handler)
+    # Do not propagate to root to avoid duplicate logs in some environments
+    logger.propagate = False
+
+
+def add_file_logger(results_dir: str) -> None:
+    """Attach a file handler to the module logger writing into results_dir.
+
+    Safe to call multiple times; it will avoid adding duplicate file handlers.
+    """
+    log_path = os.path.join(results_dir, "experiment.log")
+    # Avoid duplicate file handlers pointing to the same file
+    for h in logger.handlers:
+        if isinstance(h, logging.FileHandler):
+            try:
+                if getattr(h, 'baseFilename', None) == os.path.abspath(log_path):
+                    return
+            except Exception:
+                pass
+    file_handler = logging.FileHandler(log_path, encoding="utf-8")
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(_formatter)
+    logger.addHandler(file_handler)
 
 from cbt.model import CBTModel
 from cbt.training import CBTTrainer
@@ -78,7 +117,7 @@ def collate_fn(batch):
 
 def train_cbt_model(config, device, results_dir):
     """Train a CBT model with given configuration."""
-    print(f"\nTraining CBT model: {config}")
+    logger.info(f"Training CBT model: {config}")
     
     # Load dataset
     dataset = load_dataset("salesforce/wikitext", "wikitext-2-raw-v1", split="train")
@@ -87,10 +126,14 @@ def train_cbt_model(config, device, results_dir):
     
     # Create dataset wrapper
     train_dataset = WikiTextDataset(dataset, tokenizer, max_length=128)
+    logger.info(
+        f"Prepared WikiText train dataset with {len(train_dataset)} tokenized samples"
+    )
     
     # Create validation dataset (use a subset)
     val_size = min(500, len(train_dataset) // 20)
     val_dataset = torch.utils.data.Subset(train_dataset, range(val_size))
+    logger.info(f"Validation subset size: {len(val_dataset)}")
     
     # Create dataloaders
     train_dataloader = DataLoader(
@@ -140,20 +183,22 @@ def train_cbt_model(config, device, results_dir):
     alpha_schedule = [0.0, 0.25, 0.5, 0.75, 1.0, 1.0, 1.0]
     
     # Train the model
+    logger.info("Starting training")
     trainer.train(
         num_epochs=len(alpha_schedule),
         alpha_schedule=alpha_schedule,
         save_path=f"{results_dir}/cbt_model_{config['name']}.pt"
     )
+    logger.info("Finished training and saved checkpoint")
     
     return model, tokenizer
 
 
 def run_trained_granularity_sweep(device, results_dir):
     """Run granularity sweep with trained models."""
-    print("\n" + "="*60)
-    print("TRAINED GRANULARITY SWEEP")
-    print("="*60)
+    logger.info("=" * 60)
+    logger.info("TRAINED GRANULARITY SWEEP")
+    logger.info("=" * 60)
     
     # Load base model for comparison
     base_model = GPT2LMHeadModel.from_pretrained("gpt2")
@@ -161,7 +206,7 @@ def run_trained_granularity_sweep(device, results_dir):
     
     # Get evaluation texts
     eval_texts = get_wikitext_eval_texts(num_samples=15)
-    print(f"Using {len(eval_texts)} evaluation texts")
+    logger.info(f"Using {len(eval_texts)} evaluation texts")
     
     # Define configurations
     configs = [
@@ -175,7 +220,7 @@ def run_trained_granularity_sweep(device, results_dir):
     sweep_results = {}
     
     for config in configs:
-        print(f"\nTraining and evaluating: {config['name']}")
+        logger.info(f"Training and evaluating configuration: {config['name']}")
         
         # Train the model
         model, tokenizer = train_cbt_model(config, device, results_dir)
@@ -192,21 +237,26 @@ def run_trained_granularity_sweep(device, results_dir):
             "config": config
         }
         
-        print(f"  Quality hit: {quality_results['quality_hit_percent']:.2f}%")
-        print(f"  Median active: {sparsity_results['overall_median_active_concepts']:.1f}")
+        logger.info(f"Quality hit: {quality_results['quality_hit_percent']:.2f}%")
+        logger.info(
+            f"Median active concepts: {sparsity_results['overall_median_active_concepts']:.1f}"
+        )
     
     # Save results
     with open(f"{results_dir}/trained_granularity_sweep.json", 'w') as f:
         json.dump(sweep_results, f, indent=2)
+    logger.info(
+        f"Saved trained granularity sweep results to {results_dir}/trained_granularity_sweep.json"
+    )
     
     return sweep_results
 
 
 def run_trained_placement_study(device, results_dir):
     """Run placement study with trained models."""
-    print("\n" + "="*60)
-    print("TRAINED PLACEMENT STUDY")
-    print("="*60)
+    logger.info("=" * 60)
+    logger.info("TRAINED PLACEMENT STUDY")
+    logger.info("=" * 60)
     
     # Load base model for comparison
     base_model = GPT2LMHeadModel.from_pretrained("gpt2")
@@ -214,7 +264,7 @@ def run_trained_placement_study(device, results_dir):
     
     # Get evaluation texts
     eval_texts = get_wikitext_eval_texts(num_samples=15)
-    print(f"Using {len(eval_texts)} evaluation texts")
+    logger.info(f"Using {len(eval_texts)} evaluation texts")
     
     # Define placements
     placements = [
@@ -226,7 +276,7 @@ def run_trained_placement_study(device, results_dir):
     placement_results = {}
     
     for config in placements:
-        print(f"\nTraining and evaluating: {config['name']} blocks")
+        logger.info(f"Training and evaluating placement: {config['name']} blocks")
         
         # Train the model
         model, tokenizer = train_cbt_model(config, device, results_dir)
@@ -243,31 +293,37 @@ def run_trained_placement_study(device, results_dir):
             "blocks": config["concept_blocks"]
         }
         
-        print(f"  Quality hit: {quality_results['quality_hit_percent']:.2f}%")
-        print(f"  Median active: {sparsity_results['overall_median_active_concepts']:.1f}")
+        logger.info(f"Quality hit: {quality_results['quality_hit_percent']:.2f}%")
+        logger.info(
+            f"Median active concepts: {sparsity_results['overall_median_active_concepts']:.1f}"
+        )
     
     # Save results
     with open(f"{results_dir}/trained_placement_study.json", 'w') as f:
         json.dump(placement_results, f, indent=2)
+    logger.info(
+        f"Saved trained placement study results to {results_dir}/trained_placement_study.json"
+    )
     
     return placement_results
 
 
 def main():
     """Run trained CBT experiments."""
-    print("=== TRAINED CBT EXPERIMENT RUNNER ===")
-    print("This will train CBT models and then evaluate them.")
+    logger.info("=== TRAINED CBT EXPERIMENT RUNNER ===")
+    logger.info("This will train CBT models and then evaluate them.")
     
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    logger.info(f"Using device: {device}")
     
     # Create results directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_dir = f"trained_cbt_experiment_results_{timestamp}"
     os.makedirs(results_dir, exist_ok=True)
-    
-    print(f"Results will be saved to: {results_dir}/")
+    # Start logging to file as well
+    add_file_logger(results_dir)
+    logger.info(f"Results will be saved to: {results_dir}/")
     
     try:
         # Run trained granularity sweep
@@ -277,9 +333,9 @@ def main():
         placement_results = run_trained_placement_study(device, results_dir)
         
         # Generate summary
-        print("\n" + "="*60)
-        print("EXPERIMENT SUMMARY")
-        print("="*60)
+        logger.info("=" * 60)
+        logger.info("EXPERIMENT SUMMARY")
+        logger.info("=" * 60)
         
         # Find best configuration
         best_config = None
@@ -305,25 +361,22 @@ def main():
         # Save summary
         with open(f"{results_dir}/experiment_summary.json", 'w') as f:
             json.dump(summary, f, indent=2)
-        
-        print(f"\n🎉 TRAINED EXPERIMENTS COMPLETED!")
-        print(f"📁 All results saved to: {results_dir}/")
-        print(f"📊 Best configuration: {best_config}")
-        print(f"📊 Best quality hit: {best_score:.2f}%")
+        logger.info("🎉 TRAINED EXPERIMENTS COMPLETED!")
+        logger.info(f"📁 All results saved to: {results_dir}/")
+        logger.info(f"📊 Best configuration: {best_config}")
+        logger.info(f"📊 Best quality hit: {best_score:.2f}%")
         
         return True
         
     except Exception as e:
-        print(f"\n❌ Experiment failed: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(f"❌ Experiment failed: {e}")
         return False
 
 
 if __name__ == "__main__":
     success = main()
     if success:
-        print("\n✅ Trained experiments completed successfully!")
+        logger.info("✅ Trained experiments completed successfully!")
     else:
-        print("\n❌ Trained experiments failed!")
-        sys.exit(1) 
+        logger.error("❌ Trained experiments failed!")
+        sys.exit(1)

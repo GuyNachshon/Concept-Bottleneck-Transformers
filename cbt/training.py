@@ -96,12 +96,14 @@ class CBTTrainer:
                 "use_advanced_losses": use_advanced_losses
             })
     
-    def compute_reconstruction_loss(self, hidden_states: torch.Tensor, concept_activations: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def compute_reconstruction_loss(self, reconstruction_targets: Dict[str, torch.Tensor], concept_activations: Dict[str, torch.Tensor]) -> torch.Tensor:
         """
-        Compute reconstruction loss between original and reconstructed hidden states.
+        Compute reconstruction loss between original (pre-concept) and reconstructed hidden states per block.
         """
+        if not concept_activations:
+            return torch.tensor(0.0, device=self.device)
         total_loss = 0.0
-        num_blocks = len(concept_activations)
+        num_blocks = 0
         
         for block_name, concepts in concept_activations.items():
             # Get the concept layer for this block
@@ -111,8 +113,11 @@ class CBTTrainer:
             reconstructed = concept_layer.decoder(concepts)
             
             # Compute MSE loss
-            loss = nn.MSELoss()(reconstructed, hidden_states)
-            total_loss += loss
+            if block_name in reconstruction_targets:
+                target = reconstruction_targets[block_name]
+                loss = nn.MSELoss()(reconstructed, target)
+                total_loss += loss
+                num_blocks += 1
         
         return total_loss / num_blocks if num_blocks > 0 else torch.tensor(0.0, device=self.device)
     
@@ -190,15 +195,16 @@ class CBTTrainer:
         
         # Compute basic losses
         reconstruction_loss = self.compute_reconstruction_loss(
-            outputs.get("hidden_states", torch.zeros(1, device=self.device)), concept_activations
+            outputs.get("reconstruction_targets", {}), concept_activations
         )
         sparsity_loss = self.compute_sparsity_loss(concept_activations)
         
-        # Initialize total loss with basic losses
+        # Initialize total loss with basic losses; scale concept-related terms by alpha
+        current_alpha = getattr(self.model, "alpha", 0.0)
         total_loss = (
             self.loss_weights["task"] * task_loss +
-            self.loss_weights["reconstruction"] * reconstruction_loss +
-            self.loss_weights["sparsity"] * sparsity_loss
+            current_alpha * self.loss_weights["reconstruction"] * reconstruction_loss +
+            current_alpha * self.loss_weights["sparsity"] * sparsity_loss
         )
         
         # Compute advanced losses if enabled
@@ -232,8 +238,8 @@ class CBTTrainer:
                     update_anchors=True
                 )
             
-            # Add advanced losses to total
-            total_loss += self.advanced_loss_manager.get_total_loss(advanced_losses)
+            # Add advanced losses to total, scaled by alpha to avoid dominating early
+            total_loss += current_alpha * self.advanced_loss_manager.get_total_loss(advanced_losses)
         
         # Backward/opt only when there are trainable params and alpha > 0
         do_optimize = any(p.requires_grad for p in self.model.parameters()) and getattr(self.model, "alpha", 0.0) > 0.0

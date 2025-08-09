@@ -60,6 +60,7 @@ class CBTModel(nn.Module):
         
         # Store concept activations during forward pass
         self.concept_activations = {}
+        reconstruction_targets: Dict[str, torch.Tensor] = {}
         
     def set_alpha(self, alpha: float):
         """Set the bypass mixing parameter alpha."""
@@ -84,6 +85,7 @@ class CBTModel(nn.Module):
             concept_edits: Dict of concept_key -> activation_value for editing
         """
         self.concept_activations = {}
+        reconstruction_targets: Dict[str, torch.Tensor] = {}
 
         # Shortcut: if alpha == 0 and no edits, delegate to base model for numerical stability
         if self.alpha == 0.0 and concept_edits is None:
@@ -107,6 +109,7 @@ class CBTModel(nn.Module):
                 out["concept_activations"] = {}
                 if hasattr(base_outputs, "hidden_states") and base_outputs.hidden_states is not None:
                     out["hidden_states"] = base_outputs.hidden_states[-1]
+                out["reconstruction_targets"] = {}
             return out
         hidden_states = self.base_model.transformer.wte(input_ids)
         position_ids = torch.arange(0, input_ids.size(-1), dtype=torch.long, device=input_ids.device)
@@ -119,6 +122,8 @@ class CBTModel(nn.Module):
             if block_idx in self.concept_blocks:
                 # Only invoke concept layer when alpha > 0 to avoid unstable early training
                 if self.alpha > 0.0:
+                    # Save pre-concept hidden as reconstruction target for this block
+                    reconstruction_targets[f"block_{block_idx}"] = hidden_states
                     concept_layer = self.concept_layers[f"block_{block_idx}"]
                     hidden_states, concepts = concept_layer(hidden_states, alpha=self.alpha)
                     
@@ -159,6 +164,8 @@ class CBTModel(nn.Module):
             output["concept_activations"] = self.concept_activations
             # Store hidden states for reconstruction loss
             output["hidden_states"] = hidden_states
+            # Provide per-block reconstruction targets (pre-mix h)
+            output["reconstruction_targets"] = reconstruction_targets
         
         return output
 

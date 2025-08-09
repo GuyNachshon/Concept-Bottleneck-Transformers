@@ -184,21 +184,24 @@ def train_cbt_model(config, device, results_dir):
         model=model,
         train_dataloader=train_dataloader,
         val_dataloader=val_dataloader,
-        learning_rate=1e-4,
+        learning_rate=5e-5,
         weight_decay=0.01,
         device=device,
         use_wandb=False,
         use_advanced_losses=True,
         advanced_loss_config={
-            "orthogonality_weight": 0.01,
-            "stability_weight": 0.01,
-            "kl_weight": 1.0,
-            "concept_dropout_weight": 0.01
-        }
+            "orthogonality_weight": 0.005,
+            "stability_weight": 0.005,
+            "kl_weight": 0.5,
+            "concept_dropout_weight": 0.005
+        },
+        gradient_clip_max_norm=0.5,
+        use_mixed_precision=True,
+        freeze_base_until_alpha=0.5,
     )
     
     # Training schedule (shorter for experiments)
-    alpha_schedule = [0.0, 0.25, 0.5, 0.75, 1.0, 1.0, 1.0]
+    alpha_schedule = [0.0, 0.1, 0.2, 0.3, 0.5, 0.75, 0.9, 1.0]
     
     # Train the model
     logger.info("Starting training")

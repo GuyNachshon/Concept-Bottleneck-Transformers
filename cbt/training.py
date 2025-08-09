@@ -199,7 +199,13 @@ class CBTTrainer:
         
         # Compute advanced losses if enabled
         advanced_losses = {}
-        if self.use_advanced_losses and self.advanced_loss_manager is not None:
+        # Compute advanced losses only when concepts are active and alpha > 0
+        if (
+            self.use_advanced_losses
+            and self.advanced_loss_manager is not None
+            and len(concept_activations) > 0
+            and getattr(self.model, "alpha", 0.0) > 0.0
+        ):
             # Get base model logits for KL distillation
             if self.base_model is None:
                 # Lazy load base model
@@ -212,13 +218,15 @@ class CBTTrainer:
                 base_logits = base_outputs.logits
             
             # Compute advanced losses
-            advanced_losses = self.advanced_loss_manager.compute_losses(
-                model=self.model,
-                concept_activations=concept_activations,
-                cbt_logits=outputs["logits"],
-                base_logits=base_logits,
-                update_anchors=True
-            )
+            # Force full precision for numerically sensitive ops (e.g., SVD)
+            with autocast(enabled=False):
+                advanced_losses = self.advanced_loss_manager.compute_losses(
+                    model=self.model,
+                    concept_activations=concept_activations,
+                    cbt_logits=outputs["logits"].float(),
+                    base_logits=base_logits.float(),
+                    update_anchors=True
+                )
             
             # Add advanced losses to total
             total_loss += self.advanced_loss_manager.get_total_loss(advanced_losses)

@@ -100,6 +100,7 @@ def _json_serializable(obj):
 def set_global_seed(seed: int = 0):
     import random
     import numpy as np
+    import os as _os
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -107,6 +108,9 @@ def set_global_seed(seed: int = 0):
         torch.cuda.manual_seed_all(seed)
     # Optional determinism (can be slower)
     try:
+        # Required by cuBLAS for deterministic GEMMs on CUDA >= 10.2
+        if _os.environ.get("CUBLAS_WORKSPACE_CONFIG") is None:
+            _os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         torch.use_deterministic_algorithms(True)
     except Exception:
         pass

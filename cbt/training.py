@@ -42,6 +42,14 @@ class CBTTrainer:
         self.use_advanced_losses = use_advanced_losses
         self.gradient_clip_max_norm = gradient_clip_max_norm
         
+        # Keep a stable list of advanced loss names for consistent logging
+        self.advanced_loss_names = [
+            "orthogonality",
+            "stability",
+            "kl_distillation",
+            "concept_dropout",
+        ]
+        
         # Optimizer
         self.optimizer = optim.AdamW(
             self.model.parameters(),
@@ -152,18 +160,25 @@ class CBTTrainer:
         
         # Extract losses and activations
         task_loss = outputs["loss"]
+        # Guard against NaNs/Infs in the task loss
         if torch.isnan(task_loss) or torch.isinf(task_loss):
-            return {
-                "total_loss": float('nan'),
-                "task_loss": float('nan'),
-                "reconstruction_loss": float('nan'),
-                "sparsity_loss": float('nan')
+            # Return consistent keys with NaNs to avoid KeyError downstream
+            nan_loss = float('nan')
+            loss_dict = {
+                "total_loss": nan_loss,
+                "task_loss": nan_loss,
+                "reconstruction_loss": nan_loss,
+                "sparsity_loss": nan_loss,
             }
+            for name in self.advanced_loss_names:
+                loss_dict[f"advanced_{name}"] = nan_loss
+            return loss_dict
+        
         concept_activations = outputs["concept_activations"]
         
         # Compute basic losses
         reconstruction_loss = self.compute_reconstruction_loss(
-            outputs.get("hidden_states", torch.zeros(1)), concept_activations
+            outputs.get("hidden_states", torch.zeros(1, device=self.device)), concept_activations
         )
         sparsity_loss = self.compute_sparsity_loss(concept_activations)
         
@@ -178,7 +193,6 @@ class CBTTrainer:
         advanced_losses = {}
         if self.use_advanced_losses and self.advanced_loss_manager is not None:
             # Get base model logits for KL distillation
-            base_logits = None
             if self.base_model is None:
                 # Lazy load base model
                 from transformers import GPT2LMHeadModel
@@ -199,27 +213,30 @@ class CBTTrainer:
             )
             
             # Add advanced losses to total
-            advanced_total = self.advanced_loss_manager.get_total_loss(advanced_losses)
-            total_loss += advanced_total
+            total_loss += self.advanced_loss_manager.get_total_loss(advanced_losses)
         
         # Backward pass
         total_loss.backward()
+        # Clip gradients to stabilize training
         if self.gradient_clip_max_norm is not None and self.gradient_clip_max_norm > 0:
             clip_grad_norm_(self.model.parameters(), max_norm=self.gradient_clip_max_norm)
         self.optimizer.step()
         
-        # Prepare return dictionary
+        # Prepare return dictionary with consistent keys
         loss_dict = {
             "total_loss": total_loss.item(),
             "task_loss": task_loss.item(),
             "reconstruction_loss": reconstruction_loss.item(),
-            "sparsity_loss": sparsity_loss.item()
+            "sparsity_loss": sparsity_loss.item(),
         }
-        
-        # Add advanced loss components
-        if advanced_losses:
-            for name, loss in advanced_losses.items():
-                loss_dict[f"advanced_{name}"] = loss.item()
+        # Ensure all advanced keys are present
+        for name in self.advanced_loss_names:
+            key = f"advanced_{name}"
+            if name in advanced_losses:
+                loss_dict[key] = advanced_losses[name].item()
+            else:
+                # zero if not computed/disabled
+                loss_dict[key] = 0.0
         
         return loss_dict
     

@@ -231,20 +231,22 @@ class CBTTrainer:
             # Add advanced losses to total
             total_loss += self.advanced_loss_manager.get_total_loss(advanced_losses)
         
-        # Backward pass
-        if self.use_mixed_precision:
-            self.scaler.scale(total_loss).backward()
-            # Unscale before clipping
-            self.scaler.unscale_(self.optimizer)
-            if self.gradient_clip_max_norm is not None and self.gradient_clip_max_norm > 0:
-                clip_grad_norm_(self.model.parameters(), max_norm=self.gradient_clip_max_norm)
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-        else:
-            total_loss.backward()
-            if self.gradient_clip_max_norm is not None and self.gradient_clip_max_norm > 0:
-                clip_grad_norm_(self.model.parameters(), max_norm=self.gradient_clip_max_norm)
-            self.optimizer.step()
+        # Backward/opt only when there are trainable params and alpha > 0
+        do_optimize = any(p.requires_grad for p in self.model.parameters()) and getattr(self.model, "alpha", 0.0) > 0.0
+        if do_optimize:
+            if self.use_mixed_precision:
+                self.scaler.scale(total_loss).backward()
+                # Unscale before clipping
+                self.scaler.unscale_(self.optimizer)
+                if self.gradient_clip_max_norm is not None and self.gradient_clip_max_norm > 0:
+                    clip_grad_norm_(self.model.parameters(), max_norm=self.gradient_clip_max_norm)
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+            else:
+                total_loss.backward()
+                if self.gradient_clip_max_norm is not None and self.gradient_clip_max_norm > 0:
+                    clip_grad_norm_(self.model.parameters(), max_norm=self.gradient_clip_max_norm)
+                self.optimizer.step()
         
         # Prepare return dictionary with consistent keys
         loss_dict = {

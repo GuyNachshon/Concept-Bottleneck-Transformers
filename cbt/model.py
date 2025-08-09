@@ -84,6 +84,26 @@ class CBTModel(nn.Module):
             concept_edits: Dict of concept_key -> activation_value for editing
         """
         self.concept_activations = {}
+
+        # Shortcut: if alpha == 0 and no edits, delegate to base model for numerical stability
+        if self.alpha == 0.0 and concept_edits is None:
+            base_outputs = self.base_model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels,
+                output_hidden_states=return_concepts,
+                return_dict=True,
+            )
+            out = {
+                "logits": base_outputs.logits,
+            }
+            if labels is not None and hasattr(base_outputs, "loss") and base_outputs.loss is not None:
+                out["loss"] = base_outputs.loss
+            if return_concepts:
+                out["concept_activations"] = {}
+                if hasattr(base_outputs, "hidden_states") and base_outputs.hidden_states is not None:
+                    out["hidden_states"] = base_outputs.hidden_states[-1]
+            return out
         hidden_states = self.base_model.transformer.wte(input_ids)
         position_ids = torch.arange(0, input_ids.size(-1), dtype=torch.long, device=input_ids.device)
         position_ids = position_ids.unsqueeze(0).expand_as(input_ids)

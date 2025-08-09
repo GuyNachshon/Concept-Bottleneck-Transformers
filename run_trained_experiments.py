@@ -58,6 +58,7 @@ def add_file_logger(results_dir: str) -> None:
 from cbt.model import CBTModel
 from cbt.training import CBTTrainer
 from cbt.evaluation import CBTEvaluator, get_wikitext_eval_texts
+from cbt.concept_analysis import ConceptAnalyzer
 
 
 class WikiTextDataset(Dataset):
@@ -113,6 +114,23 @@ def collate_fn(batch):
         "input_ids": torch.stack(padded_input_ids),
         "attention_mask": torch.stack(padded_attention_masks)
     }
+
+
+def create_mining_dataloader(tokenizer, split: str = "validation", max_samples: int = 300, batch_size: int = 4):
+    """Create a small WikiText dataloader for concept mining/labeling."""
+    dataset = load_dataset("salesforce/wikitext", "wikitext-2-raw-v1", split=split)
+    # Limit to max_samples non-empty items
+    if max_samples and max_samples < len(dataset):
+        dataset = dataset.select(range(max_samples))
+    mining_dataset = WikiTextDataset(dataset, tokenizer, max_length=128)
+    logger.info(f"Mining dataset prepared from split='{split}' with {len(mining_dataset)} samples")
+    return DataLoader(
+        mining_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        collate_fn=collate_fn,
+        num_workers=0,
+    )
 
 
 def train_cbt_model(config, device, results_dir):
@@ -241,6 +259,28 @@ def run_trained_granularity_sweep(device, results_dir):
         logger.info(
             f"Median active concepts: {sparsity_results['overall_median_active_concepts']:.1f}"
         )
+
+        # Concept mining and LLM labeling
+        analysis_dir = os.path.join(results_dir, f"concept_analysis_{config['name']}")
+        os.makedirs(analysis_dir, exist_ok=True)
+        logger.info(f"Starting concept mining and LLM labeling → {analysis_dir}")
+        analyzer = ConceptAnalyzer(
+            model,
+            tokenizer,
+            device=str(device),
+            use_llm_labeling=True,
+            label_provider="auto",  # auto-pick provider from env
+            label_model="gpt-4",
+        )
+        mining_loader = create_mining_dataloader(tokenizer, split="validation", max_samples=300, batch_size=4)
+        analysis_results = analyzer.analyze_concepts(
+            mining_loader,
+            save_path=analysis_dir,
+            max_samples=300,
+        )
+        # Attach brief analysis summary to results
+        sweep_results[config["name"]]["analysis_summary"] = analysis_results.get("summary", {})
+        logger.info("Concept analysis + labeling completed")
     
     # Save results
     with open(f"{results_dir}/trained_granularity_sweep.json", 'w') as f:
@@ -297,6 +337,27 @@ def run_trained_placement_study(device, results_dir):
         logger.info(
             f"Median active concepts: {sparsity_results['overall_median_active_concepts']:.1f}"
         )
+
+        # Concept mining and LLM labeling for placement study
+        analysis_dir = os.path.join(results_dir, f"concept_analysis_placement_{config['name']}")
+        os.makedirs(analysis_dir, exist_ok=True)
+        logger.info(f"Starting concept mining and LLM labeling → {analysis_dir}")
+        analyzer = ConceptAnalyzer(
+            model,
+            tokenizer,
+            device=str(device),
+            use_llm_labeling=True,
+            label_provider="auto",
+            label_model="gpt-4",
+        )
+        mining_loader = create_mining_dataloader(tokenizer, split="validation", max_samples=300, batch_size=4)
+        analysis_results = analyzer.analyze_concepts(
+            mining_loader,
+            save_path=analysis_dir,
+            max_samples=300,
+        )
+        placement_results[config["name"]]["analysis_summary"] = analysis_results.get("summary", {})
+        logger.info("Concept analysis + labeling completed")
     
     # Save results
     with open(f"{results_dir}/trained_placement_study.json", 'w') as f:

@@ -12,6 +12,7 @@ from tqdm import tqdm
 import wandb
 from .model import CBTModel
 from .advanced_losses import AdvancedLossManager
+from torch.nn.utils import clip_grad_norm_
 
 
 class CBTTrainer:
@@ -30,7 +31,8 @@ class CBTTrainer:
         use_wandb: bool = False,
         project_name: str = "cbt-experiment",
         use_advanced_losses: bool = True,
-        advanced_loss_config: Optional[Dict] = None
+        advanced_loss_config: Optional[Dict] = None,
+        gradient_clip_max_norm: float = 1.0
     ):
         self.model = model.to(device)
         self.train_dataloader = train_dataloader
@@ -38,6 +40,7 @@ class CBTTrainer:
         self.device = device
         self.use_wandb = use_wandb
         self.use_advanced_losses = use_advanced_losses
+        self.gradient_clip_max_norm = gradient_clip_max_norm
         
         # Optimizer
         self.optimizer = optim.AdamW(
@@ -149,6 +152,13 @@ class CBTTrainer:
         
         # Extract losses and activations
         task_loss = outputs["loss"]
+        if torch.isnan(task_loss) or torch.isinf(task_loss):
+            return {
+                "total_loss": float('nan'),
+                "task_loss": float('nan'),
+                "reconstruction_loss": float('nan'),
+                "sparsity_loss": float('nan')
+            }
         concept_activations = outputs["concept_activations"]
         
         # Compute basic losses
@@ -194,6 +204,8 @@ class CBTTrainer:
         
         # Backward pass
         total_loss.backward()
+        if self.gradient_clip_max_norm is not None and self.gradient_clip_max_norm > 0:
+            clip_grad_norm_(self.model.parameters(), max_norm=self.gradient_clip_max_norm)
         self.optimizer.step()
         
         # Prepare return dictionary

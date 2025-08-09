@@ -218,7 +218,15 @@ def main():
     
     # Create concept analyzer
     print("Initializing concept analyzer...")
-    analyzer = ConceptAnalyzer(model, tokenizer, device)
+    analyzer = ConceptAnalyzer(
+        model,
+        tokenizer,
+        device,
+        use_llm_labeling=True,           # ensure AI labeling is used
+        label_provider="auto",           # pick openai/anthropic/local/mock based on env
+        label_model="gpt-4",             # default model name
+        label_api_key=None,
+    )
     
     # Perform comprehensive analysis
     print("Starting concept analysis...")

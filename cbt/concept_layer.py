@@ -8,26 +8,42 @@ import torch.nn.functional as F
 from typing import Tuple, Optional
 
 
-def entmax15(inputs, dim=-1, n_iter=10):
+def entmax15(logits: torch.Tensor, dim: int = -1) -> torch.Tensor:
     """
-    EntMax 1.5 implementation for sparse attention.
+    Numerically stable sparse activation. Using sparsemax as a safe proxy for Entmax-1.5.
+
+    Reference: Martins & Astudillo (2016) - From Softmax to Sparsemax.
     """
-    with torch.no_grad():
-        inputs = inputs / 2
-        inputs -= inputs.max(dim=dim, keepdim=True)[0]
+    # Shift by max for numerical stability
+    z = logits - logits.max(dim=dim, keepdim=True)[0]
 
-    for _ in range(n_iter):
-        inputs = inputs / 2
-        inputs -= inputs.max(dim=dim, keepdim=True)[0]
-        
-        exp_inputs = torch.exp(inputs)
-        exp_sum = exp_inputs.sum(dim=dim, keepdim=True)
-        exp_sq_sum = (exp_inputs ** 2).sum(dim=dim, keepdim=True)
-        
-        tau = exp_sum / exp_sq_sum
-        inputs = inputs - tau
+    # Sort z in descending order
+    z_sorted, _ = torch.sort(z, descending=True, dim=dim)
+    z_cumsum = z_sorted.cumsum(dim=dim)
 
-    return F.softmax(inputs, dim=dim)
+    # Determine k(z)
+    dims = z.size(dim)
+    range_k = torch.arange(1, dims + 1, device=logits.device, dtype=logits.dtype)
+    # Reshape range_k for broadcasting
+    while range_k.dim() < z_sorted.dim():
+        range_k = range_k.unsqueeze(0)
+    range_k = range_k.transpose(0, dim) if dim != 0 else range_k
+
+    support = 1 + range_k * z_sorted > z_cumsum
+    k = support.sum(dim=dim, keepdim=True).clamp(min=1)
+
+    # Compute threshold tau
+    z_supported = torch.where(support, z_sorted, torch.zeros_like(z_sorted))
+    tau = (z_supported.cumsum(dim=dim).gather(dim, k - 1) - 1) / k.to(logits.dtype)
+
+    # Compute sparsemax probabilities
+    p = torch.clamp(z - tau, min=0.0)
+    # Ensure normalization (due to numerical issues)
+    p_sum = p.sum(dim=dim, keepdim=True)
+    p = torch.where(p_sum > 0, p / p_sum, torch.zeros_like(p))
+    # Sanitize any NaNs/Infs
+    p = torch.nan_to_num(p, nan=0.0, posinf=0.0, neginf=0.0)
+    return p
 
 
 class ConceptLayer(nn.Module):
@@ -84,7 +100,7 @@ class ConceptLayer(nn.Module):
         # Encode to concept logits
         concept_logits = self.encoder(h)  # [batch_size, seq_len, m]
         
-        # Apply entmax for sparse probabilities
+        # Apply sparse activation (sparsemax proxy for entmax15)
         concept_probs = entmax15(concept_logits, dim=-1)  # [batch_size, seq_len, m]
         
         # Apply top-k sparsification
@@ -95,7 +111,8 @@ class ConceptLayer(nn.Module):
         else:
             concepts = concept_probs
         
-        # Apply dropout to concepts
+        # Sanitize and apply dropout to concepts
+        concepts = torch.nan_to_num(concepts, nan=0.0, posinf=0.0, neginf=0.0)
         concepts = self.dropout(concepts)
         
         # Decode back to hidden state
@@ -125,5 +142,5 @@ class ConceptLayer(nn.Module):
             concepts.scatter_(-1, topk_idx, topk_vals)
         else:
             concepts = concept_probs
-            
-        return concepts 
+        concepts = torch.nan_to_num(concepts, nan=0.0, posinf=0.0, neginf=0.0)
+        return concepts

@@ -16,6 +16,7 @@ import pandas as pd
 from tqdm import tqdm
 import json
 import os
+from .llm_labeling import create_llm_labeler
 
 
 class ConceptMiner:
@@ -158,10 +159,30 @@ class ConceptLabeler:
     Automatically labels concepts using LLM or rule-based methods.
     """
     
-    def __init__(self, model_name="gpt-3.5-turbo", use_llm=True):
+    def __init__(
+        self,
+        model_name: str = "gpt-4",
+        use_llm: bool = True,
+        provider: str = "mock",
+        api_key: Optional[str] = None,
+    ):
+        """Concept labeler that can use real LLMs via llm_labeling or fallback rules.
+
+        Args:
+            model_name: LLM model name
+            use_llm: Whether to use an LLM provider
+            provider: One of {"openai", "anthropic", "local", "mock"}
+            api_key: Optional API key for provider
+        """
         self.model_name = model_name
         self.use_llm = use_llm
-        self.labels = {}
+        self.provider = provider
+        self.labels: Dict[str, str] = {}
+        self.llm_labeler = (
+            create_llm_labeler(provider=provider, model_name=model_name, api_key=api_key)
+            if use_llm
+            else None
+        )
     
     def label_concepts(self, mining_results, max_contexts_per_concept=10):
         """
@@ -176,34 +197,27 @@ class ConceptLabeler:
         """
         print("Labeling concepts...")
         
+        # If configured for LLM, delegate to real labeler in batch
+        if self.use_llm and self.llm_labeler is not None:
+            self.labels = self.llm_labeler.batch_label_concepts(
+                mining_results,
+                max_contexts_per_concept=max_contexts_per_concept,
+                save_path=None,
+            )
+            return self.labels
+        
+        # Rule-based fallback
         for concept_key, concept_data in tqdm(mining_results.items()):
-            if not concept_data["top_contexts"]:
+            if not concept_data.get("top_contexts"):
                 continue
-            
-            # Get top contexts for labeling
             contexts = concept_data["top_contexts"][:max_contexts_per_concept]
             context_texts = [ctx["context"] for ctx in contexts]
-            
-            if self.use_llm:
-                label = self._label_with_llm(context_texts)
-            else:
-                label = self._label_with_rules(context_texts, concept_data)
-            
+            label = self._label_with_rules(context_texts, concept_data)
             self.labels[concept_key] = label
-        
         return self.labels
     
     def _label_with_llm(self, contexts):
-        """
-        Label concept using LLM (placeholder for now).
-        In practice, you'd use OpenAI API or similar.
-        """
-        # Placeholder - in practice, you'd make an API call like:
-        # prompt = f"What concept unifies these contexts?\n\n" + "\n".join(contexts)
-        # response = openai.ChatCompletion.create(model=self.model_name, messages=[...])
-        # return response.choices[0].message.content
-        
-        # For now, use a simple heuristic
+        """Deprecated: labeling delegated to llm_labeler.batch_label_concepts."""
         return self._label_with_rules(contexts, {})
     
     def _label_with_rules(self, contexts, concept_data):
@@ -402,13 +416,42 @@ class ConceptAnalyzer:
     Main class for comprehensive concept analysis.
     """
     
-    def __init__(self, model, tokenizer, device="cpu"):
+    def __init__(
+        self,
+        model,
+        tokenizer,
+        device: str = "cpu",
+        use_llm_labeling: bool = True,
+        label_provider: str = "auto",
+        label_model: str = "gpt-4",
+        label_api_key: Optional[str] = None,
+    ):
         self.model = model
         self.tokenizer = tokenizer
         self.device = device
         
         self.miner = ConceptMiner(model, tokenizer, device)
-        self.labeler = ConceptLabeler()
+        # Auto-select provider if requested
+        if use_llm_labeling:
+            provider = label_provider
+            if label_provider == "auto":
+                if os.getenv("OPENAI_API_KEY"):
+                    provider = "openai"
+                elif os.getenv("ANTHROPIC_API_KEY"):
+                    provider = "anthropic"
+                elif os.getenv("LOCAL_LLM_URL"):
+                    provider = "local"
+                else:
+                    provider = "mock"
+            self.labeler = ConceptLabeler(
+                model_name=label_model,
+                use_llm=True,
+                provider=provider,
+                api_key=label_api_key,
+            )
+        else:
+            self.labeler = ConceptLabeler(use_llm=False)
+        
         self.visualizer = ConceptVisualizer()
         
         self.mining_results = None

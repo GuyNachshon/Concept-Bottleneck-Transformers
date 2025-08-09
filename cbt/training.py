@@ -5,7 +5,7 @@ Training utilities for CBT models.
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler
 from torch.utils.data import DataLoader
 from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
@@ -46,7 +46,11 @@ class CBTTrainer:
         self.gradient_clip_max_norm = gradient_clip_max_norm
         self.use_mixed_precision = use_mixed_precision and torch.cuda.is_available()
         self.freeze_base_until_alpha = freeze_base_until_alpha
-        self.scaler = GradScaler(enabled=self.use_mixed_precision)
+        # Use new torch.amp API to avoid deprecation warnings
+        if torch.cuda.is_available():
+            self.scaler = GradScaler('cuda', enabled=self.use_mixed_precision)
+        else:
+            self.scaler = GradScaler(enabled=False)
         
         # Keep a stable list of advanced loss names for consistent logging
         self.advanced_loss_names = [
@@ -158,7 +162,7 @@ class CBTTrainer:
         
         # Forward pass with concept activations
         # Forward pass (AMP if enabled)
-        with autocast(enabled=self.use_mixed_precision):
+        with autocast('cuda', enabled=self.use_mixed_precision):
             outputs = self.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -219,7 +223,7 @@ class CBTTrainer:
             
             # Compute advanced losses
             # Force full precision for numerically sensitive ops (e.g., SVD)
-            with autocast(enabled=False):
+            with autocast('cuda', enabled=False):
                 advanced_losses = self.advanced_loss_manager.compute_losses(
                     model=self.model,
                     concept_activations=concept_activations,

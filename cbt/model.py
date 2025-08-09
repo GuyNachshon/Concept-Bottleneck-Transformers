@@ -93,16 +93,21 @@ class CBTModel(nn.Module):
         for block_idx, block in enumerate(self.base_model.transformer.h):
             hidden_states = block(hidden_states)[0]  # GPT-2 handles attention internally
             if block_idx in self.concept_blocks:
-                concept_layer = self.concept_layers[f"block_{block_idx}"]
-                hidden_states, concepts = concept_layer(hidden_states, alpha=self.alpha)
-                
-                # Apply concept edits if provided
-                if concept_edits is not None:
-                    concepts = self._apply_concept_edits(concepts, block_idx, concept_edits)
-                    # Reconstruct hidden states with edited concepts
-                    hidden_states = (1 - self.alpha) * hidden_states + self.alpha * concept_layer.decoder(concepts)
-                
-                self.concept_activations[f"block_{block_idx}"] = concepts
+                # Only invoke concept layer when alpha > 0 to avoid unstable early training
+                if self.alpha > 0.0:
+                    concept_layer = self.concept_layers[f"block_{block_idx}"]
+                    hidden_states, concepts = concept_layer(hidden_states, alpha=self.alpha)
+                    
+                    # Apply concept edits if provided
+                    if concept_edits is not None:
+                        concepts = self._apply_concept_edits(concepts, block_idx, concept_edits)
+                        # Reconstruct hidden states with edited concepts
+                        hidden_states = (1 - self.alpha) * hidden_states + self.alpha * concept_layer.decoder(concepts)
+                    
+                    self.concept_activations[f"block_{block_idx}"] = concepts
+                else:
+                    # Alpha == 0: skip concept computation entirely
+                    pass
 
         hidden_states = self.base_model.transformer.ln_f(hidden_states)
         lm_logits = self.base_model.lm_head(hidden_states)

@@ -77,8 +77,9 @@ def _json_serializable(obj):
         return {str(_json_serializable(k)): _json_serializable(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple, set)):
         return [_json_serializable(x) for x in obj]
-    if np is not None and isinstance(obj, (np.bool_, np.bool8)):
-        return bool(obj)
+    # NumPy scalar types
+    if np is not None and isinstance(obj, np.generic):
+        return _json_serializable(obj.item())
     if np is not None and isinstance(obj, (np.integer,)):
         return int(obj)
     if np is not None and isinstance(obj, (np.floating,)):

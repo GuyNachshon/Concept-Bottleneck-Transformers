@@ -10,39 +10,40 @@ from typing import Tuple, Optional
 
 def entmax15(logits: torch.Tensor, dim: int = -1) -> torch.Tensor:
     """
-    Numerically stable sparse activation. Using sparsemax as a safe proxy for Entmax-1.5.
-
+    Sparsemax (stable proxy for Entmax-1.5) along dimension dim.
     Reference: Martins & Astudillo (2016) - From Softmax to Sparsemax.
     """
+    if dim < 0:
+        dim = logits.dim() + dim
+
     # Shift by max for numerical stability
     z = logits - logits.max(dim=dim, keepdim=True)[0]
 
-    # Sort z in descending order
+    # Sort and cumulative sums
     z_sorted, _ = torch.sort(z, descending=True, dim=dim)
     z_cumsum = z_sorted.cumsum(dim=dim)
 
-    # Determine k(z)
-    dims = z.size(dim)
-    range_k = torch.arange(1, dims + 1, device=logits.device, dtype=logits.dtype)
-    # Reshape range_k for broadcasting
-    while range_k.dim() < z_sorted.dim():
-        range_k = range_k.unsqueeze(0)
-    range_k = range_k.transpose(0, dim) if dim != 0 else range_k
+    # rhos shape broadcastable to z_sorted along dim
+    k_size = logits.size(dim)
+    shape = [1] * logits.dim()
+    shape[dim] = k_size
+    rhos = torch.arange(1, k_size + 1, device=logits.device, dtype=logits.dtype).view(shape)
 
-    support = 1 + range_k * z_sorted > z_cumsum
+    # Determine support: z_sorted - (z_cumsum - 1)/rhos > 0
+    threshold = (z_cumsum - 1) / rhos
+    support = (z_sorted - threshold) > 0
     k = support.sum(dim=dim, keepdim=True).clamp(min=1)
 
-    # Compute threshold tau
-    z_supported = torch.where(support, z_sorted, torch.zeros_like(z_sorted))
-    tau = (z_supported.cumsum(dim=dim).gather(dim, k - 1) - 1) / k.to(logits.dtype)
+    # Compute tau = (sum_{j<=k} z_{(j)} - 1)/k
+    tau = (z_cumsum.gather(dim, k - 1) - 1) / k.to(logits.dtype)
 
-    # Compute sparsemax probabilities
+    # Sparsemax projection
     p = torch.clamp(z - tau, min=0.0)
-    # Ensure normalization (due to numerical issues)
-    p_sum = p.sum(dim=dim, keepdim=True)
-    p = torch.where(p_sum > 0, p / p_sum, torch.zeros_like(p))
-    # Sanitize any NaNs/Infs
+    # Sanitize
     p = torch.nan_to_num(p, nan=0.0, posinf=0.0, neginf=0.0)
+    # Renormalize in case of small numeric drift
+    psum = p.sum(dim=dim, keepdim=True)
+    p = torch.where(psum > 0, p / psum, torch.zeros_like(p))
     return p
 
 

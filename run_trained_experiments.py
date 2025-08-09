@@ -310,6 +310,62 @@ def run_stabilization_run(device, results_dir):
     return results
 
 
+def run_stabilization_run_kl(device, results_dir):
+    """Second controlled run: add KL-only distillation, keep α small."""
+    logger.info("=" * 60)
+    logger.info("STABILIZATION RUN (KL-only)")
+    logger.info("=" * 60)
+
+    base_model = GPT2LMHeadModel.from_pretrained("gpt2")
+    base_model.to(device)
+
+    eval_texts = get_wikitext_eval_texts(num_samples=15)
+    logger.info(f"Using {len(eval_texts)} evaluation texts")
+
+    config = {"name": "stab_kl_m32_k4", "concept_blocks": [4, 5, 6, 7], "m": 32, "k": 4}
+
+    alpha_schedule = [0.0, 0.05, 0.10, 0.15, 0.20]
+
+    # Train with KL only
+    model, tokenizer = train_cbt_model(
+        config,
+        device,
+        results_dir,
+        learning_rate=5e-5,
+        use_advanced_losses=True,
+        advanced_loss_config={
+            "kl_weight": 0.2,
+            "orthogonality_weight": 0.0,
+            "stability_weight": 0.0,
+            "concept_dropout_weight": 0.0,
+        },
+        gradient_clip_max_norm=0.5,
+        use_mixed_precision=True,
+        freeze_base_until_alpha=1.0,  # freeze GPT-2; learn concept layers only
+        alpha_schedule_override=alpha_schedule,
+    )
+
+    evaluator = CBTEvaluator(model, base_model, tokenizer, device)
+    quality_results = evaluator.evaluate_quality(eval_texts)
+    sparsity_results = evaluator.evaluate_sparsity(eval_texts)
+
+    results = {
+        "quality": quality_results,
+        "sparsity": sparsity_results,
+        "config": config,
+        "alpha_schedule": alpha_schedule,
+    }
+
+    path = f"{results_dir}/stabilization_kl_results.json"
+    with open(path, "w") as f:
+        json.dump(_json_serializable(results), f, indent=2)
+    logger.info(f"KL-only stabilization results saved to {path}")
+    logger.info(f"Quality hit: {quality_results.get('quality_hit_percent', float('nan'))}")
+    logger.info(f"Median active: {sparsity_results.get('overall_median_active_concepts', float('nan'))}")
+
+    return results
+
+
 def run_trained_granularity_sweep(device, results_dir):
     """Run granularity sweep with trained models."""
     logger.info("=" * 60)
@@ -487,6 +543,8 @@ def main():
     try:
         # Run stabilization-only training; skip full sweep for now
         stab_results = run_stabilization_run(device, results_dir)
+        # Run KL-only stabilization
+        stab_kl_results = run_stabilization_run_kl(device, results_dir)
         
         # Generate summary
         logger.info("=" * 60)
@@ -497,9 +555,15 @@ def main():
         best_config = None
         best_score = float('inf')
         
-        # Best config is stabilization run only
-        best_config = "stab_m32_k4"
-        best_score = stab_results["quality"].get("quality_hit_percent", float('inf'))
+        # Choose better of the two stabilization runs
+        s1 = stab_results["quality"].get("quality_hit_percent", float('inf'))
+        s2 = stab_kl_results["quality"].get("quality_hit_percent", float('inf'))
+        if s2 < s1:
+            best_config = "stab_kl_m32_k4"
+            best_score = s2
+        else:
+            best_config = "stab_m32_k4"
+            best_score = s1
         
         summary = {
             "timestamp": timestamp,
@@ -507,7 +571,8 @@ def main():
             "best_config": best_config,
             "best_score": best_score,
             "experiments": {
-                "stabilization_run": "completed"
+                "stabilization_run": "completed",
+                "stabilization_run_kl": "completed"
             }
         }
         

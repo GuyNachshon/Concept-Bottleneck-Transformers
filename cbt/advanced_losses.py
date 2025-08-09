@@ -180,6 +180,10 @@ class ConceptDropoutLoss:
         Returns:
             Concept dropout loss
         """
+        if not concept_activations:
+            # No active concept blocks (e.g., alpha == 0). Return zero loss on a safe device later.
+            return torch.tensor(0.0)
+
         total_loss = 0.0
         
         for concepts in concept_activations.values():
@@ -200,7 +204,7 @@ class ConceptDropoutLoss:
             
             total_loss += loss
         
-        return self.weight * total_loss / len(concept_activations)
+        return self.weight * total_loss / max(1, len(concept_activations))
 
 
 class AdvancedLossManager:
@@ -269,10 +273,23 @@ class AdvancedLossManager:
         if cbt_logits is not None and base_logits is not None:
             losses['kl_distillation'] = self.kl_loss(cbt_logits, base_logits)
         else:
-            losses['kl_distillation'] = torch.tensor(0.0, device=next(iter(concept_activations.values())).device)
+            # Choose a safe device
+            try:
+                dev = next(iter(concept_activations.values())).device
+            except StopIteration:
+                dev = next(model.parameters()).device
+            losses['kl_distillation'] = torch.tensor(0.0, device=dev)
         
         # Concept dropout loss
-        losses['concept_dropout'] = self.concept_dropout_loss(concept_activations)
+        cd_loss = self.concept_dropout_loss(concept_activations)
+        # Ensure device consistency
+        if cd_loss.device.type == 'cpu':
+            try:
+                dev = next(iter(concept_activations.values())).device
+            except StopIteration:
+                dev = next(model.parameters()).device
+            cd_loss = cd_loss.to(dev)
+        losses['concept_dropout'] = cd_loss
         
         # Store for logging
         self.loss_components = losses

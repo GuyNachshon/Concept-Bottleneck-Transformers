@@ -133,7 +133,19 @@ def create_mining_dataloader(tokenizer, split: str = "validation", max_samples: 
     )
 
 
-def train_cbt_model(config, device, results_dir):
+def train_cbt_model(
+    config,
+    device,
+    results_dir,
+    *,
+    learning_rate: float = 5e-5,
+    use_advanced_losses: bool = True,
+    advanced_loss_config: dict | None = None,
+    gradient_clip_max_norm: float = 0.5,
+    use_mixed_precision: bool = True,
+    freeze_base_until_alpha: float = 0.5,
+    alpha_schedule_override: list[float] | None = None,
+):
     """Train a CBT model with given configuration."""
     logger.info(f"Training CBT model: {config}")
     
@@ -184,24 +196,24 @@ def train_cbt_model(config, device, results_dir):
         model=model,
         train_dataloader=train_dataloader,
         val_dataloader=val_dataloader,
-        learning_rate=5e-5,
+        learning_rate=learning_rate,
         weight_decay=0.01,
         device=device,
         use_wandb=False,
-        use_advanced_losses=True,
-        advanced_loss_config={
+        use_advanced_losses=use_advanced_losses,
+        advanced_loss_config=(advanced_loss_config or {
             "orthogonality_weight": 0.005,
             "stability_weight": 0.005,
             "kl_weight": 0.5,
             "concept_dropout_weight": 0.005
-        },
-        gradient_clip_max_norm=0.5,
-        use_mixed_precision=True,
-        freeze_base_until_alpha=0.5,
+        }),
+        gradient_clip_max_norm=gradient_clip_max_norm,
+        use_mixed_precision=use_mixed_precision,
+        freeze_base_until_alpha=freeze_base_until_alpha,
     )
     
     # Training schedule (shorter for experiments)
-    alpha_schedule = [0.0, 0.1, 0.2, 0.3, 0.5, 0.75, 0.9, 1.0]
+    alpha_schedule = alpha_schedule_override or [0.0, 0.1, 0.2, 0.3, 0.5, 0.75, 0.9, 1.0]
     
     # Train the model
     logger.info("Starting training")
@@ -213,6 +225,56 @@ def train_cbt_model(config, device, results_dir):
     logger.info("Finished training and saved checkpoint")
     
     return model, tokenizer
+
+
+def run_stabilization_run(device, results_dir):
+    """Single controlled training run to stabilize concepts before sweeping."""
+    logger.info("=" * 60)
+    logger.info("STABILIZATION RUN (single config)")
+    logger.info("=" * 60)
+
+    base_model = GPT2LMHeadModel.from_pretrained("gpt2")
+    base_model.to(device)
+
+    eval_texts = get_wikitext_eval_texts(num_samples=15)
+    logger.info(f"Using {len(eval_texts)} evaluation texts")
+
+    config = {"name": "stab_m32_k4", "concept_blocks": [4, 5, 6, 7], "m": 32, "k": 4}
+
+    alpha_schedule = [0.0, 0.05, 0.10, 0.15, 0.20]
+
+    # Train with conservative settings
+    model, tokenizer = train_cbt_model(
+        config,
+        device,
+        results_dir,
+        learning_rate=5e-5,
+        use_advanced_losses=False,
+        gradient_clip_max_norm=0.5,
+        use_mixed_precision=True,
+        freeze_base_until_alpha=1.0,  # freeze GPT-2; learn concept layers only
+        alpha_schedule_override=alpha_schedule,
+    )
+
+    evaluator = CBTEvaluator(model, base_model, tokenizer, device)
+    quality_results = evaluator.evaluate_quality(eval_texts)
+    sparsity_results = evaluator.evaluate_sparsity(eval_texts)
+
+    results = {
+        "quality": quality_results,
+        "sparsity": sparsity_results,
+        "config": config,
+        "alpha_schedule": alpha_schedule,
+    }
+
+    with open(f"{results_dir}/stabilization_results.json", "w") as f:
+        json.dump(results, f, indent=2)
+
+    logger.info(f"Stabilization results saved to {results_dir}/stabilization_results.json")
+    logger.info(f"Quality hit: {quality_results.get('quality_hit_percent', float('nan'))}")
+    logger.info(f"Median active: {sparsity_results.get('overall_median_active_concepts', float('nan'))}")
+
+    return results
 
 
 def run_trained_granularity_sweep(device, results_dir):
@@ -390,11 +452,8 @@ def main():
     logger.info(f"Results will be saved to: {results_dir}/")
     
     try:
-        # Run trained granularity sweep
-        granularity_results = run_trained_granularity_sweep(device, results_dir)
-        
-        # Run trained placement study
-        placement_results = run_trained_placement_study(device, results_dir)
+        # Run stabilization-only training; skip full sweep for now
+        stab_results = run_stabilization_run(device, results_dir)
         
         # Generate summary
         logger.info("=" * 60)
@@ -405,11 +464,9 @@ def main():
         best_config = None
         best_score = float('inf')
         
-        for config_name, config_results in granularity_results.items():
-            quality_hit = config_results["quality"]["quality_hit_percent"]
-            if quality_hit < best_score:
-                best_score = quality_hit
-                best_config = config_name
+        # Best config is stabilization run only
+        best_config = "stab_m32_k4"
+        best_score = stab_results["quality"].get("quality_hit_percent", float('inf'))
         
         summary = {
             "timestamp": timestamp,
@@ -417,8 +474,7 @@ def main():
             "best_config": best_config,
             "best_score": best_score,
             "experiments": {
-                "trained_granularity_sweep": "completed",
-                "trained_placement_study": "completed"
+                "stabilization_run": "completed"
             }
         }
         

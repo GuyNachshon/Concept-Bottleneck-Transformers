@@ -31,7 +31,7 @@ class ConceptMiner:
         self.concept_contexts = defaultdict(list)
         self.concept_activations = defaultdict(list)
     
-    def mine_concepts(self, dataloader, max_samples=1000, activation_threshold=0.01):
+    def mine_concepts(self, dataloader, max_samples=1000, activation_threshold=0.01, max_per_concept: int = 2000):
         """
         Mine concept activations from a dataset.
         
@@ -99,6 +99,9 @@ class ConceptMiner:
                                 context = self._extract_context(tokens, token_idx, window=5)
                                 concept_key = f"{block_name}_concept_{concept_idx}"
                                 
+                                # Cap contexts per concept to avoid huge artifacts
+                                if len(self.concept_contexts[concept_key]) >= max_per_concept:
+                                    continue
                                 self.concept_contexts[concept_key].append({
                                     "context": context,
                                     "token": tokens[token_idx],

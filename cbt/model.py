@@ -87,10 +87,14 @@ class CBTModel(nn.Module):
 
         # Shortcut: if alpha == 0 and no edits, delegate to base model for numerical stability
         if self.alpha == 0.0 and concept_edits is None:
+            masked_labels = None
+            if labels is not None and attention_mask is not None:
+                masked_labels = labels.clone()
+                masked_labels = masked_labels.masked_fill(attention_mask == 0, -100)
             base_outputs = self.base_model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
-                labels=labels,
+                labels=masked_labels if masked_labels is not None else labels,
                 output_hidden_states=return_concepts,
                 return_dict=True,
             )
@@ -138,8 +142,17 @@ class CBTModel(nn.Module):
             # Shift so that tokens < n predict n
             shift_logits = lm_logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            # Apply mask to labels so padded positions are ignored
+            if attention_mask is not None:
+                shift_attn = attention_mask[..., 1:].contiguous()
+                masked_shift_labels = shift_labels.masked_fill(shift_attn == 0, -100)
+            else:
+                masked_shift_labels = shift_labels
+            if masked_shift_labels.numel() == 0:
+                loss = torch.tensor(0.0, device=lm_logits.device)
+            else:
+                loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
+                loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), masked_shift_labels.view(-1))
             output["loss"] = loss
         
         if return_concepts:

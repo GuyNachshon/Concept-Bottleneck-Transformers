@@ -5,6 +5,7 @@ Training utilities for CBT models.
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.cuda.amp import autocast, GradScaler
 from torch.utils.data import DataLoader
 from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
@@ -32,7 +33,9 @@ class CBTTrainer:
         project_name: str = "cbt-experiment",
         use_advanced_losses: bool = True,
         advanced_loss_config: Optional[Dict] = None,
-        gradient_clip_max_norm: float = 1.0
+        gradient_clip_max_norm: float = 1.0,
+        use_mixed_precision: bool = True,
+        freeze_base_until_alpha: float = 0.25
     ):
         self.model = model.to(device)
         self.train_dataloader = train_dataloader
@@ -41,6 +44,9 @@ class CBTTrainer:
         self.use_wandb = use_wandb
         self.use_advanced_losses = use_advanced_losses
         self.gradient_clip_max_norm = gradient_clip_max_norm
+        self.use_mixed_precision = use_mixed_precision and torch.cuda.is_available()
+        self.freeze_base_until_alpha = freeze_base_until_alpha
+        self.scaler = GradScaler(enabled=self.use_mixed_precision)
         
         # Keep a stable list of advanced loss names for consistent logging
         self.advanced_loss_names = [
@@ -151,12 +157,14 @@ class CBTTrainer:
             attention_mask = attention_mask.to(self.device)
         
         # Forward pass with concept activations
-        outputs = self.model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            labels=input_ids,
-            return_concepts=True
-        )
+        # Forward pass (AMP if enabled)
+        with autocast(enabled=self.use_mixed_precision):
+            outputs = self.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=input_ids,
+                return_concepts=True
+            )
         
         # Extract losses and activations
         task_loss = outputs["loss"]
@@ -216,11 +224,19 @@ class CBTTrainer:
             total_loss += self.advanced_loss_manager.get_total_loss(advanced_losses)
         
         # Backward pass
-        total_loss.backward()
-        # Clip gradients to stabilize training
-        if self.gradient_clip_max_norm is not None and self.gradient_clip_max_norm > 0:
-            clip_grad_norm_(self.model.parameters(), max_norm=self.gradient_clip_max_norm)
-        self.optimizer.step()
+        if self.use_mixed_precision:
+            self.scaler.scale(total_loss).backward()
+            # Unscale before clipping
+            self.scaler.unscale_(self.optimizer)
+            if self.gradient_clip_max_norm is not None and self.gradient_clip_max_norm > 0:
+                clip_grad_norm_(self.model.parameters(), max_norm=self.gradient_clip_max_norm)
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+        else:
+            total_loss.backward()
+            if self.gradient_clip_max_norm is not None and self.gradient_clip_max_norm > 0:
+                clip_grad_norm_(self.model.parameters(), max_norm=self.gradient_clip_max_norm)
+            self.optimizer.step()
         
         # Prepare return dictionary with consistent keys
         loss_dict = {
@@ -295,6 +311,10 @@ class CBTTrainer:
             # Set alpha for this epoch
             current_alpha = alpha_schedule[min(epoch, len(alpha_schedule) - 1)]
             self.model.set_alpha(current_alpha)
+            # Optionally freeze/unfreeze base model parameters based on alpha
+            requires_grad = current_alpha >= self.freeze_base_until_alpha
+            for p in self.model.base_model.parameters():
+                p.requires_grad = requires_grad
             
             # Training loop
             train_losses = []

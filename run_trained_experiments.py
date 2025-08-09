@@ -94,6 +94,40 @@ def _json_serializable(obj):
     return str(obj)
 
 
+# -----------------------------------------------------------------------------
+# Utilities: seeding and artifact saving
+# -----------------------------------------------------------------------------
+def set_global_seed(seed: int = 0):
+    import random
+    import numpy as np
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    # Optional determinism (can be slower)
+    try:
+        torch.use_deterministic_algorithms(True)
+    except Exception:
+        pass
+    try:
+        import torch.backends.cudnn as cudnn
+        cudnn.deterministic = True
+        cudnn.benchmark = False
+    except Exception:
+        pass
+
+
+def save_concept_weights(model: CBTModel, save_dir: str, tag: str):
+    import numpy as np
+    os.makedirs(save_dir, exist_ok=True)
+    weights = {}
+    for name, layer in model.concept_layers.items():
+        weights[f"{name}.encoder.weight"] = layer.encoder.weight.detach().cpu().numpy()
+        weights[f"{name}.decoder.weight"] = layer.decoder.weight.detach().cpu().numpy()
+    np.savez(os.path.join(save_dir, f"concept_weights_{tag}.npz"), **weights)
+
+
 class WikiTextDataset(Dataset):
     """Dataset wrapper for WikiText."""
     
@@ -269,7 +303,7 @@ def run_stabilization_run(device, results_dir):
     base_model = GPT2LMHeadModel.from_pretrained("gpt2")
     base_model.to(device)
 
-    eval_texts = get_wikitext_eval_texts(num_samples=15)
+    eval_texts = get_wikitext_eval_texts(num_samples=200)
     logger.info(f"Using {len(eval_texts)} evaluation texts")
 
     config = {"name": "stab_m32_k4", "concept_blocks": [4, 5, 6, 7], "m": 32, "k": 4}
@@ -288,6 +322,9 @@ def run_stabilization_run(device, results_dir):
         freeze_base_until_alpha=1.0,  # freeze GPT-2; learn concept layers only
         alpha_schedule_override=alpha_schedule,
     )
+
+    # Save concept weights
+    save_concept_weights(model, results_dir, tag=config["name"])
 
     evaluator = CBTEvaluator(model, base_model, tokenizer, device)
     quality_results = evaluator.evaluate_quality(eval_texts)
@@ -319,7 +356,7 @@ def run_stabilization_run_kl(device, results_dir):
     base_model = GPT2LMHeadModel.from_pretrained("gpt2")
     base_model.to(device)
 
-    eval_texts = get_wikitext_eval_texts(num_samples=15)
+    eval_texts = get_wikitext_eval_texts(num_samples=200)
     logger.info(f"Using {len(eval_texts)} evaluation texts")
 
     config = {"name": "stab_kl_m32_k4", "concept_blocks": [4, 5, 6, 7], "m": 32, "k": 4}
@@ -345,6 +382,7 @@ def run_stabilization_run_kl(device, results_dir):
         alpha_schedule_override=alpha_schedule,
     )
 
+    save_concept_weights(model, results_dir, tag=config["name"])
     evaluator = CBTEvaluator(model, base_model, tokenizer, device)
     quality_results = evaluator.evaluate_quality(eval_texts)
     sparsity_results = evaluator.evaluate_sparsity(eval_texts)
@@ -364,6 +402,81 @@ def run_stabilization_run_kl(device, results_dir):
     logger.info(f"Median active: {sparsity_results.get('overall_median_active_concepts', float('nan'))}")
 
     return results
+
+
+def run_stabilization_run_kl_alpha30(device, results_dir):
+    logger.info("=" * 60)
+    logger.info("STABILIZATION RUN (KL-only, α→0.30)")
+    logger.info("=" * 60)
+
+    base_model = GPT2LMHeadModel.from_pretrained("gpt2")
+    base_model.to(device)
+
+    eval_texts = get_wikitext_eval_texts(num_samples=200)
+    logger.info(f"Using {len(eval_texts)} evaluation texts")
+
+    config = {"name": "stab_kl_m32_k4_a30", "concept_blocks": [4, 5, 6, 7], "m": 32, "k": 4}
+    alpha_schedule = [0.0, 0.05, 0.10, 0.15, 0.20, 0.30]
+
+    model, tokenizer = train_cbt_model(
+        config,
+        device,
+        results_dir,
+        learning_rate=5e-5,
+        use_advanced_losses=True,
+        advanced_loss_config={
+            "kl_weight": 0.2,
+            "orthogonality_weight": 0.0,
+            "stability_weight": 0.0,
+            "concept_dropout_weight": 0.0,
+        },
+        gradient_clip_max_norm=0.5,
+        use_mixed_precision=True,
+        freeze_base_until_alpha=1.0,
+        alpha_schedule_override=alpha_schedule,
+    )
+
+    save_concept_weights(model, results_dir, tag=config["name"])
+
+    evaluator = CBTEvaluator(model, base_model, tokenizer, device)
+    quality_results = evaluator.evaluate_quality(eval_texts)
+    sparsity_results = evaluator.evaluate_sparsity(eval_texts)
+
+    results = {
+        "quality": quality_results,
+        "sparsity": sparsity_results,
+        "config": config,
+        "alpha_schedule": alpha_schedule,
+    }
+
+    path = f"{results_dir}/stabilization_kl_a30_results.json"
+    with open(path, "w") as f:
+        json.dump(_json_serializable(results), f, indent=2)
+    logger.info(f"KL-only α→0.30 results saved to {path}")
+    logger.info(f"Quality hit: {quality_results.get('quality_hit_percent', float('nan'))}")
+    logger.info(f"Median active: {sparsity_results.get('overall_median_active_concepts', float('nan'))}")
+
+    return results
+
+
+def run_cross_seed_stability_v2(device, results_dir):
+    logger.info("=" * 60)
+    logger.info("CROSS-SEED RUN (KL-only, α→0.30)")
+    logger.info("=" * 60)
+
+    seeds = [0, 1, 2]
+    all_results = {}
+    for seed in seeds:
+        set_global_seed(seed)
+        logger.info(f"Training seed {seed}")
+        res = run_stabilization_run_kl_alpha30(device, results_dir)
+        all_results[f"seed_{seed}"] = res
+
+    path = f"{results_dir}/cross_seed_stability_v2.json"
+    with open(path, "w") as f:
+        json.dump(_json_serializable(all_results), f, indent=2)
+    logger.info(f"Cross-seed v2 results saved to {path}")
+    return all_results
 
 
 def run_trained_granularity_sweep(device, results_dir):
@@ -541,10 +654,15 @@ def main():
     logger.info(f"Results will be saved to: {results_dir}/")
     
     try:
+        # Seeding for reproducibility
+        set_global_seed(0)
         # Run stabilization-only training; skip full sweep for now
         stab_results = run_stabilization_run(device, results_dir)
         # Run KL-only stabilization
         stab_kl_results = run_stabilization_run_kl(device, results_dir)
+        # Run KL-only α→0.30 and cross-seed
+        stab_kl_a30_results = run_stabilization_run_kl_alpha30(device, results_dir)
+        cross_seed_results = run_cross_seed_stability_v2(device, results_dir)
         
         # Generate summary
         logger.info("=" * 60)
@@ -572,7 +690,9 @@ def main():
             "best_score": best_score,
             "experiments": {
                 "stabilization_run": "completed",
-                "stabilization_run_kl": "completed"
+                "stabilization_run_kl": "completed",
+                "stabilization_run_kl_alpha30": "completed",
+                "cross_seed_stability_v2": "completed"
             }
         }
         

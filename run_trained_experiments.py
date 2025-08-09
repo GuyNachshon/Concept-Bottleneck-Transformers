@@ -61,6 +61,38 @@ from cbt.evaluation import CBTEvaluator, get_wikitext_eval_texts
 from cbt.concept_analysis import ConceptAnalyzer
 
 
+# -----------------------------------------------------------------------------
+# JSON serialization helpers
+# -----------------------------------------------------------------------------
+def _json_serializable(obj):
+    try:
+        import numpy as np
+    except Exception:
+        np = None  # optional
+    import torch as _torch
+
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, dict):
+        return {str(_json_serializable(k)): _json_serializable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [_json_serializable(x) for x in obj]
+    if np is not None and isinstance(obj, (np.bool_, np.bool8)):
+        return bool(obj)
+    if np is not None and isinstance(obj, (np.integer,)):
+        return int(obj)
+    if np is not None and isinstance(obj, (np.floating,)):
+        return float(obj)
+    if np is not None and isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, _torch.Tensor):
+        if obj.numel() == 1:
+            return _json_serializable(obj.item())
+        return _json_serializable(obj.detach().cpu().tolist())
+    # Fallback to string
+    return str(obj)
+
+
 class WikiTextDataset(Dataset):
     """Dataset wrapper for WikiText."""
     
@@ -268,7 +300,7 @@ def run_stabilization_run(device, results_dir):
     }
 
     with open(f"{results_dir}/stabilization_results.json", "w") as f:
-        json.dump(results, f, indent=2)
+        json.dump(_json_serializable(results), f, indent=2)
 
     logger.info(f"Stabilization results saved to {results_dir}/stabilization_results.json")
     logger.info(f"Quality hit: {quality_results.get('quality_hit_percent', float('nan'))}")

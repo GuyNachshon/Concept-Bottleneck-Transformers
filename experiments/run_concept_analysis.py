@@ -272,12 +272,17 @@ def analyze_concept_specialization(activations):
             logger.warning(f"No activations found for {block_name}")
             continue
             
-        # Find the minimum sequence length to ensure compatibility
-        min_seq_len = min(acts.shape[0] for acts in block_acts_list)
-        logger.info(f"Truncating sequences to {min_seq_len} tokens for {block_name}")
+        # Check array shapes
+        shapes = [acts.shape for acts in block_acts_list]
+        logger.info(f"Array shapes for {block_name}: {shapes[:5]}...")  # Show first 5 shapes
         
-        # Truncate all arrays to the same length
-        truncated_acts = [acts[:min_seq_len] for acts in block_acts_list]
+        # Find the minimum dimensions to ensure compatibility
+        min_seq_len = min(acts.shape[0] for acts in block_acts_list)
+        min_num_concepts = min(acts.shape[1] for acts in block_acts_list)
+        logger.info(f"Truncating to {min_seq_len} tokens x {min_num_concepts} concepts for {block_name}")
+        
+        # Truncate all arrays to the same dimensions
+        truncated_acts = [acts[:min_seq_len, :min_num_concepts] for acts in block_acts_list]
         
         # Convert to numpy array
         acts_array = np.concatenate(truncated_acts, axis=0)  # [num_tokens, m]

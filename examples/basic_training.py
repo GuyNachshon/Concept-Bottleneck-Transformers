@@ -15,7 +15,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cbt.model import CBTModel
-from cbt.training import CBTTrainer
+from cbt.trainer import CBTTrainer
 
 
 class SimpleTextDataset(Dataset):
@@ -134,10 +134,13 @@ def main():
     alpha_schedule = [0.0, 0.0, 0.25, 0.5, 0.75, 1.0, 1.0, 1.0, 1.0, 1.0]
     
     print("Starting training...")
+    # Create results directory
+    os.makedirs("results/models", exist_ok=True)
+    
     trainer.train(
         num_epochs=10,
         alpha_schedule=alpha_schedule,
-        save_path="cbt_model.pt"
+        save_path="results/models/cbt_model.pt"
     )
     
     # Test the trained model

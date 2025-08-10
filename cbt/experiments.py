@@ -10,7 +10,7 @@ from tqdm import tqdm
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from datasets import load_dataset
 from .model import CBTModel
-from .evaluation import CBTEvaluator
+from .evaluator import CBTEvaluator
 
 
 def _json_serializable(obj):

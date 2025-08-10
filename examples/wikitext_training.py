@@ -16,7 +16,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cbt.model import CBTModel
-from cbt.training import CBTTrainer
+from cbt.trainer import CBTTrainer
 
 
 class WikiTextDataset(Dataset):

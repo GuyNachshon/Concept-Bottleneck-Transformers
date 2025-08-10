@@ -17,7 +17,7 @@ from cbt.experiments import (
     run_placement_study,
     run_cross_seed_stability_test
 )
-from cbt.evaluation import CBTEvaluator
+from cbt.evaluator import CBTEvaluator
 from cbt.model import CBTModel
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
@@ -33,7 +33,7 @@ def main():
     print(f"Results will be saved to: {results_dir}/")
     
     # Get evaluation texts from WikiText dataset
-    from cbt.evaluation import get_wikitext_eval_texts
+    from cbt.evaluator import get_wikitext_eval_texts
     eval_texts = get_wikitext_eval_texts(num_samples=20)
     print(f"Using {len(eval_texts)} evaluation texts from WikiText")
     

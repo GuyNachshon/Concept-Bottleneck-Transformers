@@ -7,7 +7,7 @@ to create human-auditable, steerable concepts.
 
 from .concept_layer import ConceptLayer
 from .model import CBTModel
-from .training import CBTTrainer
+from .trainer import CBTTrainer
 from .advanced_losses import (
     OrthogonalityLoss,
     StabilityLoss,
@@ -15,7 +15,7 @@ from .advanced_losses import (
     ConceptDropoutLoss,
     AdvancedLossManager
 )
-from .concept_analysis import (
+from .analyzer import (
     ConceptMiner,
     ConceptLabeler,
     ConceptVisualizer,
@@ -31,11 +31,23 @@ from .llm_labeling import (
     MockLLMConceptLabeler,
     create_llm_labeler
 )
-from .evaluation import CBTEvaluator, get_wikitext_eval_texts
+from .evaluator import CBTEvaluator, get_wikitext_eval_texts
 from .experiments import (
     run_granularity_sweep,
     run_placement_study,
     run_cross_seed_stability_test
+)
+from .config import (
+    CBTConfig,
+    ModelConfig,
+    TrainingConfig,
+    AdvancedLossesConfig,
+    DataConfig,
+    EvaluationConfig,
+    LoggingConfig,
+    HardwareConfig,
+    load_config,
+    create_experiment_config
 )
 
 __version__ = "0.1.0"
@@ -62,5 +74,15 @@ __all__ = [
     "get_wikitext_eval_texts",
     "run_granularity_sweep",
     "run_placement_study",
-    "run_cross_seed_stability_test"
+    "run_cross_seed_stability_test",
+    "CBTConfig",
+    "ModelConfig",
+    "TrainingConfig",
+    "AdvancedLossesConfig",
+    "DataConfig",
+    "EvaluationConfig",
+    "LoggingConfig",
+    "HardwareConfig",
+    "load_config",
+    "create_experiment_config"
 ] 

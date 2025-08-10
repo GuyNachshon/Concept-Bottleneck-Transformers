@@ -12,7 +12,7 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cbt.model import CBTModel
-from cbt.evaluation import CBTEvaluator
+from cbt.evaluator import CBTEvaluator
 
 
 def main():
@@ -57,7 +57,7 @@ def main():
     base_model.to(device)
     
     # Get evaluation texts from WikiText dataset
-    from cbt.evaluation import get_wikitext_eval_texts
+    from cbt.evaluator import get_wikitext_eval_texts
     eval_texts = get_wikitext_eval_texts(num_samples=15)
     print(f"Using {len(eval_texts)} evaluation texts from WikiText")
     

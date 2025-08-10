@@ -1,0 +1,19 @@
+{
+  "experiment_name": "test_experiment",
+  "timestamp": "20250810_172119",
+  "config": {
+    "model": "gpt2",
+    "concept_blocks": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "m": 32,
+    "k": 4
+  },
+  "results": {
+    "final_loss": 0.45,
+    "val_perplexity": 42.1
+  }
+}

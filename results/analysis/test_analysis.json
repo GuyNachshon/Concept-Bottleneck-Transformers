@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-08-10T17:21:19.628119",
+  "experiment_name": "test_experiment",
+  "metrics": {
+    "perplexity": 45.2,
+    "quality_hit_percent": -2.1,
+    "sparsity": 0.15
+  },
+  "concept_analysis": {
+    "total_concepts": 128,
+    "active_concepts": 32,
+    "labeled_concepts": 25
+  }
+}

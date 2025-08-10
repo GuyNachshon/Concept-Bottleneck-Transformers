@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader, Dataset
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cbt.model import CBTModel
-from cbt.concept_analysis import ConceptMiner
+from cbt.analyzer import ConceptMiner
 from cbt.llm_labeling import create_llm_labeler
 from cbt.ablation_tools import ConceptAblator
 

@@ -13,7 +13,7 @@ from datetime import datetime
 # Add the parent directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from cbt.evaluation import get_wikitext_eval_texts
+from cbt.evaluator import get_wikitext_eval_texts
 from cbt.experiments import (
     run_granularity_sweep,
     run_placement_study,

@@ -17,7 +17,7 @@ def main():
     print("=== Granularity Sweep Demo ===\n")
     
     # Get evaluation texts from WikiText dataset
-    from cbt.evaluation import get_wikitext_eval_texts
+    from cbt.evaluator import get_wikitext_eval_texts
     eval_texts = get_wikitext_eval_texts(num_samples=15)
     print(f"Using {len(eval_texts)} evaluation texts from WikiText")
     

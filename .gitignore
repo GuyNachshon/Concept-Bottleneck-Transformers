@@ -213,6 +213,7 @@ __marimo__/
 .idea/**/dictionaries
 .idea/**/shelf
 
+.idea/
 .cursor/
 
 # AWS User-specific

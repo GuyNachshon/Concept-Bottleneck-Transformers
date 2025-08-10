@@ -11,7 +11,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cbt.model import CBTModel
-from cbt.concept_analysis import ConceptMiner
+from cbt.analyzer import ConceptMiner
 
 
 def main():

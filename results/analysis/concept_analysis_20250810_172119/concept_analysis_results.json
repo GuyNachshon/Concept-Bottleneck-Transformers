@@ -1,0 +1,22 @@
+{
+  "analysis_name": "test_concept_analysis",
+  "timestamp": "20250810_172119",
+  "concepts_analyzed": 64,
+  "top_concepts": [
+    {
+      "concept_id": "block_4_concept_0",
+      "label": "syntax",
+      "activation_count": 1250
+    },
+    {
+      "concept_id": "block_5_concept_3",
+      "label": "semantics",
+      "activation_count": 980
+    },
+    {
+      "concept_id": "block_6_concept_1",
+      "label": "context",
+      "activation_count": 756
+    }
+  ]
+}

@@ -11,7 +11,7 @@ from transformers import GPT2LMHeadModel, GPT2Tokenizer
 from datasets import load_dataset
 from .model import CBTModel
 from .advanced_losses import StabilityLoss
-from .concept_analysis import ConceptAnalyzer
+from .analyzer import ConceptAnalyzer
 from .llm_labeling import create_llm_labeler
 from .ablation_tools import ConceptAblator
 

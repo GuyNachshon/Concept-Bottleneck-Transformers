@@ -1,0 +1,62 @@
+# CBT Training Configuration
+# This file contains all training parameters for Concept-Bottleneck Transformers
+
+# Model Configuration
+model:
+  base_model_name: "gpt2"
+  concept_blocks: [4, 5, 6, 7]  # Which transformer blocks to insert concepts into
+  m: 32                         # Number of concepts per block
+  k: 4                          # Number of active concepts per token
+  alpha: 0.2                    # Bypass mixing coefficient
+
+# Training Configuration
+training:
+  batch_size: 4
+  learning_rate: 5e-5
+  num_epochs: 5
+  gradient_clip_max_norm: 0.5
+  use_mixed_precision: true
+  freeze_base_until_alpha: 1.0  # Freeze base model until alpha reaches this value
+  
+  # Alpha schedule (bypass mixing)
+  alpha_schedule: [0.0, 0.05, 0.10, 0.15, 0.20]
+  
+  # Loss weights
+  loss_weights:
+    task: 1.0              # Language modeling loss
+    reconstruction: 1.0    # Hidden state reconstruction
+    sparsity: 0.1          # L1 penalty on concept activations
+
+# Advanced Losses Configuration
+advanced_losses:
+  enabled: true
+  orthogonality_weight: 0.1    # Prevent concept duplication
+  stability_weight: 0.1        # Prevent concept ID shuffling
+  kl_weight: 0.2               # KL divergence from base model
+  dropout_weight: 0.05         # Concept dropout for distinct roles
+
+# Data Configuration
+data:
+  dataset_name: "salesforce/wikitext"
+  dataset_config: "wikitext-2-raw-v1"
+  split: "train"
+  max_length: 256
+  num_workers: 0  # Set to 0 to avoid multiprocessing issues
+
+# Evaluation Configuration
+evaluation:
+  num_samples: 200
+  eval_interval: 1  # Evaluate every N epochs
+  save_best: true
+
+# Logging Configuration
+logging:
+  log_interval: 10  # Log every N batches
+  save_interval: 1  # Save checkpoint every N epochs
+  use_wandb: false  # Set to true to enable Weights & Biases logging
+
+# Hardware Configuration
+hardware:
+  device: "auto"  # "auto", "cuda", "cpu"
+  deterministic: true  # For reproducible results
+  seed: 42 

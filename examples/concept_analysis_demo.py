@@ -15,7 +15,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cbt.model import CBTModel
-from cbt.concept_analysis import ConceptAnalyzer, ConceptVisualizer
+from cbt.analyzer import ConceptAnalyzer, ConceptVisualizer
 
 
 class SimpleTextDataset(Dataset):
@@ -293,33 +293,36 @@ def main():
         outputs = model(input_ids, attention_mask=attention_mask, return_concepts=True)
         concept_activations = outputs["concept_activations"]
         
+        # Create results directory
+        os.makedirs("results/analysis", exist_ok=True)
+        
         # Create heatmap
         print("Creating concept activation heatmap...")
         fig = visualizer.plot_concept_heatmap(concept_activations)
-        plt.savefig("concept_heatmap.png", dpi=300, bbox_inches='tight')
+        plt.savefig("results/analysis/concept_heatmap.png", dpi=300, bbox_inches='tight')
         plt.close()
         
         # Create sparsity analysis
         print("Creating sparsity analysis...")
         fig = visualizer.plot_concept_sparsity(concept_activations)
-        plt.savefig("concept_sparsity.png", dpi=300, bbox_inches='tight')
+        plt.savefig("results/analysis/concept_sparsity.png", dpi=300, bbox_inches='tight')
         plt.close()
         
         # Create clustering analysis
         print("Creating concept clustering...")
         fig = visualizer.plot_concept_clustering(concept_activations)
-        plt.savefig("concept_clustering.png", dpi=300, bbox_inches='tight')
+        plt.savefig("results/analysis/concept_clustering.png", dpi=300, bbox_inches='tight')
         plt.close()
     
     print("\n" + "="*50)
     print("ANALYSIS COMPLETE")
     print("="*50)
     print("Generated files:")
-    print("  - concept_analysis_results/ (analysis data)")
-    print("  - concept_usage.png (usage patterns)")
-    print("  - concept_heatmap.png (activation heatmap)")
-    print("  - concept_sparsity.png (sparsity analysis)")
-    print("  - concept_clustering.png (concept clustering)")
+    print("  - results/analysis/concept_analysis_results/ (analysis data)")
+    print("  - results/analysis/concept_usage.png (usage patterns)")
+    print("  - results/analysis/concept_heatmap.png (activation heatmap)")
+    print("  - results/analysis/concept_sparsity.png (sparsity analysis)")
+    print("  - results/analysis/concept_clustering.png (concept clustering)")
     
     # Interactive concept exploration
     print("\nInteractive concept exploration:")

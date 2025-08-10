@@ -13,7 +13,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cbt.model import CBTModel
-from cbt.concept_analysis import ConceptMiner, ConceptAnalyzer
+from cbt.analyzer import ConceptMiner, ConceptAnalyzer
 from cbt.ablation_tools import ConceptEditor, ConceptAblator
 from cbt.llm_labeling import create_llm_labeler
 from torch.utils.data import Dataset

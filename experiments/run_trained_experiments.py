@@ -56,9 +56,9 @@ def add_file_logger(results_dir: str) -> None:
     logger.addHandler(file_handler)
 
 from cbt.model import CBTModel
-from cbt.training import CBTTrainer
-from cbt.evaluation import CBTEvaluator, get_wikitext_eval_texts
-from cbt.concept_analysis import ConceptAnalyzer
+from cbt.trainer import CBTTrainer
+from cbt.evaluator import CBTEvaluator, get_wikitext_eval_texts
+from cbt.analyzer import ConceptAnalyzer
 
 
 # -----------------------------------------------------------------------------
@@ -694,7 +694,7 @@ def main():
     
     # Create results directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    results_dir = f"trained_cbt_experiment_results_{timestamp}"
+    results_dir = f"results/experiments_{timestamp}"
     os.makedirs(results_dir, exist_ok=True)
     # Start logging to file as well
     add_file_logger(results_dir)

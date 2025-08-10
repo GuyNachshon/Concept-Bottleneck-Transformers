@@ -359,8 +359,8 @@ def label_concepts_with_llm(concept_contexts):
     """Use LLM to label concepts based on their contexts."""
     logger.info("Labeling concepts with LLM...")
     
-    # Create LLM labeler
-    llm_labeler = create_llm_labeler(provider="auto")
+    # Create LLM labeler - use mock for now to avoid API key issues
+    llm_labeler = create_llm_labeler(provider="mock")
     
     concept_labels = {}
     
@@ -375,21 +375,16 @@ def label_concepts_with_llm(concept_contexts):
             sorted_contexts = sorted(contexts, key=lambda x: x['activation'], reverse=True)
             top_contexts = sorted_contexts[:10]  # Top 10 contexts
             
-            # Prepare context text for LLM
-            context_text = "\n".join([f"- {ctx['context']}" for ctx in top_contexts])
-            
-            # Create prompt for concept labeling
-            prompt = f"""Based on the following contexts where a neural network concept is most active, what does this concept likely represent?
-
-Contexts:
-{context_text}
-
-Please provide a concise label (1-3 words) that captures what this concept represents. Focus on linguistic, semantic, or structural patterns.
-
-Label:"""
+            # Extract context texts for the labeler
+            context_texts = [ctx['context'] for ctx in top_contexts]
             
             try:
-                label = llm_labeler.label_concept(prompt)
+                # Use the proper label_concept method
+                label = llm_labeler.label_concept(
+                    contexts=context_texts,
+                    concept_idx=concept_idx,
+                    block_idx=int(block_name.split('_')[1])  # Extract block number
+                )
                 concept_labels[block_name][concept_idx] = {
                     'label': label,
                     'num_contexts': len(contexts),

@@ -1,0 +1,92 @@
+2025-08-10 16:02:33 | INFO | cbt.trained_experiments | Results will be saved to: results/experiments_20250810_160233/
+2025-08-10 16:02:33 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 16:02:33 | INFO | cbt.trained_experiments | STABILIZATION RUN (single config)
+2025-08-10 16:02:33 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 16:02:35 | INFO | cbt.trained_experiments | Using 200 evaluation texts
+2025-08-10 16:02:35 | INFO | cbt.trained_experiments | Training CBT model: {'name': 'stab_m32_k4', 'concept_blocks': [4, 5, 6, 7], 'm': 32, 'k': 4}
+2025-08-10 16:03:01 | INFO | cbt.trained_experiments | Prepared WikiText train dataset with 23767 tokenized samples
+2025-08-10 16:03:01 | INFO | cbt.trained_experiments | Validation subset size: 500
+2025-08-10 16:03:01 | INFO | cbt.trained_experiments | Starting training
+2025-08-10 16:31:29 | INFO | cbt.trained_experiments | Finished training and saved checkpoint
+2025-08-10 16:31:44 | INFO | cbt.trained_experiments | Stabilization results saved to results/experiments_20250810_160233/stabilization_results.json
+2025-08-10 16:31:44 | INFO | cbt.trained_experiments | Quality hit: -3.181151503491771
+2025-08-10 16:31:44 | INFO | cbt.trained_experiments | Median active: 1.0
+2025-08-10 16:31:44 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 16:31:44 | INFO | cbt.trained_experiments | STABILIZATION RUN (KL-only)
+2025-08-10 16:31:44 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 16:31:45 | INFO | cbt.trained_experiments | Using 200 evaluation texts
+2025-08-10 16:31:45 | INFO | cbt.trained_experiments | Training CBT model: {'name': 'stab_kl_m32_k4', 'concept_blocks': [4, 5, 6, 7], 'm': 32, 'k': 4}
+2025-08-10 16:32:10 | INFO | cbt.trained_experiments | Prepared WikiText train dataset with 23767 tokenized samples
+2025-08-10 16:32:10 | INFO | cbt.trained_experiments | Validation subset size: 500
+2025-08-10 16:32:10 | INFO | cbt.trained_experiments | Starting training
+2025-08-10 17:18:30 | INFO | cbt.trained_experiments | Finished training and saved checkpoint
+2025-08-10 17:18:45 | INFO | cbt.trained_experiments | KL-only stabilization results saved to results/experiments_20250810_160233/stabilization_kl_results.json
+2025-08-10 17:18:45 | INFO | cbt.trained_experiments | Quality hit: -2.592113589432832
+2025-08-10 17:18:45 | INFO | cbt.trained_experiments | Median active: 1.0
+2025-08-10 17:18:45 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 17:18:45 | INFO | cbt.trained_experiments | STABILIZATION RUN (KL-only, α→0.30)
+2025-08-10 17:18:45 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 17:18:46 | INFO | cbt.trained_experiments | Using 200 evaluation texts
+2025-08-10 17:18:46 | INFO | cbt.trained_experiments | Training CBT model: {'name': 'stab_kl_m32_k4_a30', 'concept_blocks': [4, 5, 6, 7], 'm': 32, 'k': 4}
+2025-08-10 17:19:11 | INFO | cbt.trained_experiments | Prepared WikiText train dataset with 23767 tokenized samples
+2025-08-10 17:19:11 | INFO | cbt.trained_experiments | Validation subset size: 500
+2025-08-10 17:19:11 | INFO | cbt.trained_experiments | Starting training
+2025-08-10 18:18:47 | INFO | cbt.trained_experiments | Finished training and saved checkpoint
+2025-08-10 18:19:01 | INFO | cbt.trained_experiments | KL-only α→0.30 results saved to results/experiments_20250810_160233/stabilization_kl_a30_results.json
+2025-08-10 18:19:01 | INFO | cbt.trained_experiments | Quality hit: 7.694541410526154
+2025-08-10 18:19:01 | INFO | cbt.trained_experiments | Median active: 1.0
+2025-08-10 18:19:01 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 18:19:01 | INFO | cbt.trained_experiments | CROSS-SEED RUN (KL-only, α→0.30)
+2025-08-10 18:19:01 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 18:19:01 | INFO | cbt.trained_experiments | Training seed 0
+2025-08-10 18:19:01 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 18:19:01 | INFO | cbt.trained_experiments | STABILIZATION RUN (KL-only, α→0.30)
+2025-08-10 18:19:01 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 18:19:03 | INFO | cbt.trained_experiments | Using 200 evaluation texts
+2025-08-10 18:19:03 | INFO | cbt.trained_experiments | Training CBT model: {'name': 'stab_kl_m32_k4_a30', 'concept_blocks': [4, 5, 6, 7], 'm': 32, 'k': 4}
+2025-08-10 18:19:27 | INFO | cbt.trained_experiments | Prepared WikiText train dataset with 23767 tokenized samples
+2025-08-10 18:19:27 | INFO | cbt.trained_experiments | Validation subset size: 500
+2025-08-10 18:19:27 | INFO | cbt.trained_experiments | Starting training
+2025-08-10 19:18:28 | INFO | cbt.trained_experiments | Finished training and saved checkpoint
+2025-08-10 19:18:43 | INFO | cbt.trained_experiments | KL-only α→0.30 results saved to results/experiments_20250810_160233/stabilization_kl_a30_results.json
+2025-08-10 19:18:43 | INFO | cbt.trained_experiments | Quality hit: 10.3436013346199
+2025-08-10 19:18:43 | INFO | cbt.trained_experiments | Median active: 1.0
+2025-08-10 19:18:43 | INFO | cbt.trained_experiments | Training seed 1
+2025-08-10 19:18:43 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 19:18:43 | INFO | cbt.trained_experiments | STABILIZATION RUN (KL-only, α→0.30)
+2025-08-10 19:18:43 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 19:18:44 | INFO | cbt.trained_experiments | Using 200 evaluation texts
+2025-08-10 19:18:44 | INFO | cbt.trained_experiments | Training CBT model: {'name': 'stab_kl_m32_k4_a30', 'concept_blocks': [4, 5, 6, 7], 'm': 32, 'k': 4}
+2025-08-10 19:19:08 | INFO | cbt.trained_experiments | Prepared WikiText train dataset with 23767 tokenized samples
+2025-08-10 19:19:08 | INFO | cbt.trained_experiments | Validation subset size: 500
+2025-08-10 19:19:09 | INFO | cbt.trained_experiments | Starting training
+2025-08-10 20:18:20 | INFO | cbt.trained_experiments | Finished training and saved checkpoint
+2025-08-10 20:18:35 | INFO | cbt.trained_experiments | KL-only α→0.30 results saved to results/experiments_20250810_160233/stabilization_kl_a30_results.json
+2025-08-10 20:18:35 | INFO | cbt.trained_experiments | Quality hit: 8.961544163163083
+2025-08-10 20:18:35 | INFO | cbt.trained_experiments | Median active: 1.0
+2025-08-10 20:18:35 | INFO | cbt.trained_experiments | Training seed 2
+2025-08-10 20:18:35 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 20:18:35 | INFO | cbt.trained_experiments | STABILIZATION RUN (KL-only, α→0.30)
+2025-08-10 20:18:35 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 20:18:36 | INFO | cbt.trained_experiments | Using 200 evaluation texts
+2025-08-10 20:18:36 | INFO | cbt.trained_experiments | Training CBT model: {'name': 'stab_kl_m32_k4_a30', 'concept_blocks': [4, 5, 6, 7], 'm': 32, 'k': 4}
+2025-08-10 20:19:00 | INFO | cbt.trained_experiments | Prepared WikiText train dataset with 23767 tokenized samples
+2025-08-10 20:19:00 | INFO | cbt.trained_experiments | Validation subset size: 500
+2025-08-10 20:19:00 | INFO | cbt.trained_experiments | Starting training
+2025-08-10 21:18:07 | INFO | cbt.trained_experiments | Finished training and saved checkpoint
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | KL-only α→0.30 results saved to results/experiments_20250810_160233/stabilization_kl_a30_results.json
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | Quality hit: 11.542005035408565
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | Median active: 1.0
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | Cross-seed v2 results saved to results/experiments_20250810_160233/cross_seed_stability_v2.json
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | EXPERIMENT SUMMARY
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | 🎉 TRAINED EXPERIMENTS COMPLETED!
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | 📁 All results saved to: results/experiments_20250810_160233/
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | 📊 Best configuration: stab_m32_k4
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | 📊 Best quality hit: -3.18%
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | EVALUATING BEST STABILIZATION MODEL
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | ============================================================
+2025-08-10 21:18:22 | WARNING | cbt.trained_experiments | Best model checkpoint not found at results/experiments_20250810_160233/stab_m32_k4_model.pt
+2025-08-10 21:18:22 | INFO | cbt.trained_experiments | ✅ Trained experiments completed successfully!

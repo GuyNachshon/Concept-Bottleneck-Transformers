@@ -1,0 +1,40 @@
+{
+  "quality": {
+    "cbt_perplexity": 61.36736925042734,
+    "base_perplexity": 63.00041147774045,
+    "quality_hit_percent": -2.592113589432832,
+    "quality_criterion_met": true,
+    "baseline_check": {
+      "baseline_perplexity": 63.00041147774045,
+      "baseline_loss_mean": 4.143141257762909,
+      "baseline_loss_std": 0.6635682638289266,
+      "baseline_loss_range": [
+        2.871914863586426,
+        6.64855432510376
+      ]
+    },
+    "suspicious_low_perplexity": false
+  },
+  "sparsity": {
+    "overall_median_active_concepts": 1.0,
+    "overall_sparsity_criterion_met": true
+  },
+  "config": {
+    "name": "stab_kl_m32_k4",
+    "concept_blocks": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "m": 32,
+    "k": 4
+  },
+  "alpha_schedule": [
+    0.0,
+    0.05,
+    0.1,
+    0.15,
+    0.2
+  ]
+}

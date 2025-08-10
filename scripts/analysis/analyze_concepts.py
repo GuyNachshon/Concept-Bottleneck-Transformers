@@ -6,11 +6,6 @@ Simple script to run concept analysis on the latest CBT model.
 import sys
 import os
 
-# Add the project root directory to the path
-# Go up two levels from scripts/analysis/ to get to project root
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, project_root)
-
 def main():
     """Run concept analysis on the latest model."""
     print("🔍 CBT Concept Analysis")
@@ -19,7 +14,7 @@ def main():
     try:
         # Import and run the concept analysis
         import importlib.util
-        experiments_path = os.path.join(project_root, "experiments", "run_concept_analysis.py")
+        experiments_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "experiments", "run_concept_analysis.py")
         print(f"🔍 Loading from: {experiments_path}")
         
         spec = importlib.util.spec_from_file_location(

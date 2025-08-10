@@ -22,3 +22,14 @@ dependencies = [
     "python-dotenv",
     "datasets>=2.14.0",
 ]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["cbt*"]
+exclude = ["configs*", "experiments*", "scripts*", "docs*", "examples*", "tests*", "results*"]
+
+[tool.setuptools.package-data]
+cbt = ["*.py"]

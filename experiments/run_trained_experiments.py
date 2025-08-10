@@ -14,9 +14,6 @@ from datasets import load_dataset
 from torch.utils.data import DataLoader, Dataset
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
-# Add the parent directory to the path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 # -----------------------------------------------------------------------------
 # Logging setup
 # -----------------------------------------------------------------------------

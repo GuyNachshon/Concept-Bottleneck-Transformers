@@ -1,0 +1,23 @@
+{
+  "results_dir": "results/experiments_20250810_160233",
+  "model_file": "cbt_model_stab_kl_m32_k4_a30.pt",
+  "model_info": {
+    "alpha": 0.3,
+    "type": "KL (with distillation)",
+    "cross_seed": false
+  },
+  "device": "cuda",
+  "timestamp": "20250810_224243",
+  "model_config": {
+    "base_model_name": "gpt2",
+    "concept_blocks": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "m": 32,
+    "k": 4,
+    "alpha": 0.3
+  }
+}

@@ -18,9 +18,12 @@ def main():
     try:
         # Import and run the concept analysis
         import importlib.util
+        experiments_path = os.path.join(project_root, "experiments", "run_concept_analysis.py")
+        print(f"🔍 Loading from: {experiments_path}")
+        
         spec = importlib.util.spec_from_file_location(
             "run_concept_analysis", 
-            os.path.join(project_root, "experiments", "run_concept_analysis.py")
+            experiments_path
         )
         run_concept_analysis_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(run_concept_analysis_module)

@@ -34,32 +34,182 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def load_best_model(results_dir: str, device: str):
-    """Load the best performing CBT model."""
-    # Find the best model checkpoint
-    best_config = "stab_m32_k4"  # From our results
-    model_path = os.path.join(results_dir, f"{best_config}_model.pt")
+def find_latest_results_dir():
+    """Find the most recent experiment results directory."""
+    # Look for directories that match our naming pattern
+    import glob
+    
+    # Pattern for experiment result directories
+    patterns = [
+        "trained_cbt_experiment_results_*",
+        "cbt_experiment_results_*",
+        "experiment_results_*"
+    ]
+    
+    all_dirs = []
+    for pattern in patterns:
+        all_dirs.extend(glob.glob(pattern))
+    
+    if not all_dirs:
+        logger.error("No experiment results directories found!")
+        logger.info("Looking for directories matching:")
+        for pattern in patterns:
+            logger.info(f"  - {pattern}")
+        return None
+    
+    # Sort by creation time (newest first)
+    all_dirs.sort(key=lambda x: os.path.getctime(x), reverse=True)
+    
+    latest_dir = all_dirs[0]
+    logger.info(f"Found {len(all_dirs)} experiment directories:")
+    for i, dir_path in enumerate(all_dirs[:5]):  # Show top 5
+        ctime = os.path.getctime(dir_path)
+        ctime_str = datetime.fromtimestamp(ctime).strftime('%Y-%m-%d %H:%M:%S')
+        marker = " (LATEST)" if i == 0 else ""
+        logger.info(f"  {i+1}. {dir_path} - {ctime_str}{marker}")
+    
+    return latest_dir
+
+def list_available_models(results_dir: str):
+    """List all available models in a results directory."""
+    model_files = [f for f in os.listdir(results_dir) if f.endswith('.pt') and f.startswith('cbt_model_')]
+    
+    if not model_files:
+        logger.error(f"No model files found in {results_dir}")
+        return []
+    
+    logger.info(f"Available models in {results_dir}:")
+    for i, model_file in enumerate(model_files):
+        # Try to extract model info from filename
+        info = extract_model_info(model_file)
+        logger.info(f"  {i+1}. {model_file}")
+        logger.info(f"      Config: {info}")
+    
+    return model_files
+
+def extract_model_info(model_file: str):
+    """Extract model configuration from filename."""
+    info = {}
+    
+    # Extract alpha
+    if "a30" in model_file:
+        info['alpha'] = 0.3
+    elif "a20" in model_file:
+        info['alpha'] = 0.2
+    elif "a10" in model_file:
+        info['alpha'] = 0.1
+    else:
+        info['alpha'] = 0.2  # default
+    
+    # Extract model type
+    if "kl" in model_file:
+        info['type'] = "KL (with distillation)"
+    elif "stab" in model_file:
+        info['type'] = "Stabilized"
+    else:
+        info['type'] = "Standard"
+    
+    # Extract cross-seed info
+    if "cross_seed" in model_file:
+        info['cross_seed'] = True
+    else:
+        info['cross_seed'] = False
+    
+    return info
+
+def load_model_from_file(results_dir: str, model_file: str, device: str):
+    """Load a specific model file."""
+    model_path = os.path.join(results_dir, model_file)
     
     if not os.path.exists(model_path):
-        logger.error(f"Model checkpoint not found: {model_path}")
+        logger.error(f"Model file not found: {model_path}")
         return None
+    
+    # Extract model info
+    model_info = extract_model_info(model_file)
+    alpha = model_info['alpha']
+    
+    logger.info(f"Loading model: {model_file}")
+    logger.info(f"Model info: {model_info}")
+    
+    # Try different model configurations based on filename
+    if "m64" in model_file:
+        m, k = 64, 8
+    elif "m128" in model_file:
+        m, k = 128, 12
+    else:
+        m, k = 32, 4  # default
+    
+    # Try different concept block configurations
+    if "early" in model_file:
+        concept_blocks = [0, 1, 2, 3]
+    elif "late" in model_file:
+        concept_blocks = [8, 9, 10, 11]
+    else:
+        concept_blocks = [4, 5, 6, 7]  # default
     
     # Load model
     model = CBTModel(
         base_model_name="gpt2",
-        concept_blocks=[4, 5, 6, 7],
-        m=32,
-        k=4,
-        alpha=0.2  # Use the optimal alpha
+        concept_blocks=concept_blocks,
+        m=m,
+        k=k,
+        alpha=alpha
     )
     
-    checkpoint = torch.load(model_path, map_location=device)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.to(device)
-    model.eval()
+    try:
+        checkpoint = torch.load(model_path, map_location=device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.to(device)
+        model.eval()
+        
+        # Store metadata
+        model._loaded_from = model_file
+        model._model_info = model_info
+        
+        logger.info(f"Successfully loaded model: {model_file}")
+        logger.info(f"Configuration: m={m}, k={k}, alpha={alpha}, blocks={concept_blocks}")
+        return model
+    except Exception as e:
+        logger.error(f"Failed to load model {model_file}: {e}")
+        return None
+
+def load_best_model(results_dir: str, device: str, model_file: str = None):
+    """Load the best performing CBT model or a specific model."""
+    if model_file:
+        # Load specific model
+        return load_model_from_file(results_dir, model_file, device)
     
-    logger.info(f"Loaded best model: {best_config}")
-    return model
+    # Look for available model files
+    model_files = [f for f in os.listdir(results_dir) if f.endswith('.pt') and f.startswith('cbt_model_')]
+    
+    if not model_files:
+        logger.error(f"No model files found in {results_dir}")
+        logger.info("Available files:")
+        for f in os.listdir(results_dir):
+            logger.info(f"  - {f}")
+        return None
+    
+    # Prefer the KL model with alpha 0.30 as it's likely the best performing
+    preferred_models = [
+        "cbt_model_stab_kl_m32_k4_a30.pt",  # KL model with alpha 0.30
+        "cbt_model_stab_kl_m32_k4.pt",      # KL model
+        "cbt_model_stab_m32_k4.pt",         # Basic model
+        "cbt_model_stab_kl_m32_k4_cross_seed.pt",  # Cross-seed model
+    ]
+    
+    model_file = None
+    for preferred in preferred_models:
+        if preferred in model_files:
+            model_file = preferred
+            break
+    
+    if model_file is None:
+        # Fall back to the first available model
+        model_file = model_files[0]
+        logger.warning(f"No preferred model found, using: {model_file}")
+    
+    return load_model_from_file(results_dir, model_file, device)
 
 def analyze_concept_activations(model, tokenizer, device, num_texts=100):
     """Analyze concept activation patterns across different text types."""
@@ -297,29 +447,70 @@ def main():
     
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # Look for the most recent experiment results
-    results_base = "results/experiments_"
-    existing_dirs = [d for d in os.listdir("results") if d.startswith("experiments_")]
-    if existing_dirs:
-        # Sort by timestamp and get the most recent
-        existing_dirs.sort()
-        results_dir = f"results/{existing_dirs[-1]}"
-    else:
-        logger.error("No experiment results found. Please run experiments first.")
+    logger.info(f"Using device: {device}")
+    
+    # Find the latest results directory
+    results_dir = find_latest_results_dir()
+    if results_dir is None:
         return
     
+    logger.info(f"Using results directory: {results_dir}")
+    
+    # List available models
+    available_models = list_available_models(results_dir)
+    
+    # Check if user wants to analyze a specific model
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1].endswith('.pt'):
+        model_file = sys.argv[1]
+        logger.info(f"User specified model: {model_file}")
+    else:
+        model_file = None
+        logger.info("Using best available model")
+    
     # Load model
-    model = load_best_model(results_dir, device)
+    model = load_best_model(results_dir, device, model_file)
     if model is None:
         return
     
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     tokenizer.pad_token = tokenizer.eos_token
     
-    # Create analysis directory
+    # Create analysis directory in organized structure
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    analysis_dir = f"results/analysis/concept_analysis_{timestamp}"
+    model_name = getattr(model, '_loaded_from', 'unknown').replace('.pt', '')
+    
+    # Create organized directory structure
+    analysis_base = "results/analysis/concept_analysis"
+    os.makedirs(analysis_base, exist_ok=True)
+    
+    analysis_dir = os.path.join(analysis_base, f"{model_name}_{timestamp}")
     os.makedirs(analysis_dir, exist_ok=True)
+    
+    # Also create subdirectories for different types of results
+    os.makedirs(os.path.join(analysis_dir, "contexts"), exist_ok=True)
+    os.makedirs(os.path.join(analysis_dir, "labels"), exist_ok=True)
+    os.makedirs(os.path.join(analysis_dir, "causality"), exist_ok=True)
+    os.makedirs(os.path.join(analysis_dir, "specialization"), exist_ok=True)
+    
+    # Save analysis metadata
+    analysis_metadata = {
+        'results_dir': results_dir,
+        'model_file': getattr(model, '_loaded_from', 'unknown'),
+        'model_info': getattr(model, '_model_info', {}),
+        'device': str(device),
+        'timestamp': timestamp,
+        'model_config': {
+            'base_model_name': 'gpt2',
+            'concept_blocks': model.concept_blocks,
+            'm': model.m,
+            'k': model.k,
+            'alpha': model.alpha
+        }
+    }
+    
+    with open(os.path.join(analysis_dir, 'analysis_metadata.json'), 'w') as f:
+        json.dump(analysis_metadata, f, indent=2)
     
     # 1. Analyze concept activations
     logger.info("Step 1: Analyzing concept activations...")
@@ -343,6 +534,7 @@ def main():
     
     # Save all results
     results = {
+        'metadata': analysis_metadata,
         'specialization': specialization,
         'concept_labels': concept_labels,
         'causality_results': causality_results,

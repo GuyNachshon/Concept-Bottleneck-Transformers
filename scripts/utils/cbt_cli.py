@@ -113,7 +113,7 @@ def evaluate_model(model: CBTModel, config: CBTConfig, eval_texts: list = None):
 def main():
     """Main CLI function."""
     parser = argparse.ArgumentParser(description="CBT Experiment CLI")
-    parser.add_argument("command", choices=["train", "evaluate", "train-and-evaluate"], 
+    parser.add_argument("command", choices=["train", "evaluate", "train-and-evaluate", "concept-analysis"], 
                        help="Command to run")
     parser.add_argument("--config", "-c", type=str, default="configs/training.yaml",
                        help="Path to configuration file")
@@ -123,6 +123,10 @@ def main():
                        help="Number of evaluation texts")
     parser.add_argument("--verbose", "-v", action="store_true",
                        help="Enable verbose logging")
+    parser.add_argument("--results-dir", "-r", type=str, default=None,
+                       help="Specific results directory to use (auto-detects latest if not specified)")
+    parser.add_argument("--model", "-m", type=str, default=None,
+                       help="Specific model file to analyze (e.g., cbt_model_stab_kl_m32_k4_a30.pt)")
     
     args = parser.parse_args()
     
@@ -131,6 +135,21 @@ def main():
     setup_logging(level)
     
     logger = logging.getLogger(__name__)
+    
+    if args.command == "concept-analysis":
+        # Run concept analysis
+        logger.info("Running concept analysis...")
+        
+        # Import and run the concept analysis
+        from experiments.run_concept_analysis import main as run_concept_analysis
+        
+        # If user specified a model, pass it as command line argument
+        if args.model:
+            import sys
+            sys.argv = [sys.argv[0], args.model]
+        
+        run_concept_analysis()
+        return
     
     # Load configuration
     try:

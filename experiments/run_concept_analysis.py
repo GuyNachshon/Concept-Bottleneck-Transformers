@@ -267,8 +267,20 @@ def analyze_concept_specialization(activations):
     specialization_results = {}
     
     for block_name, block_acts_list in activations.items():
+        # Ensure all arrays have the same shape before concatenation
+        if not block_acts_list:
+            logger.warning(f"No activations found for {block_name}")
+            continue
+            
+        # Find the minimum sequence length to ensure compatibility
+        min_seq_len = min(acts.shape[0] for acts in block_acts_list)
+        logger.info(f"Truncating sequences to {min_seq_len} tokens for {block_name}")
+        
+        # Truncate all arrays to the same length
+        truncated_acts = [acts[:min_seq_len] for acts in block_acts_list]
+        
         # Convert to numpy array
-        acts_array = np.concatenate(block_acts_list, axis=0)  # [num_tokens, m]
+        acts_array = np.concatenate(truncated_acts, axis=0)  # [num_tokens, m]
         
         # Calculate concept usage statistics
         concept_usage = np.mean(acts_array > 0, axis=0)  # [m]

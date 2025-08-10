@@ -142,14 +142,20 @@ def main():
         logger.info("Running concept analysis...")
         
         # Import and run the concept analysis
-        from experiments.run_concept_analysis import main as run_concept_analysis
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "run_concept_analysis", 
+            os.path.join(project_root, "experiments", "run_concept_analysis.py")
+        )
+        run_concept_analysis_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(run_concept_analysis_module)
         
         # If user specified a model, pass it as command line argument
         if args.model:
             import sys
             sys.argv = [sys.argv[0], args.model]
         
-        run_concept_analysis()
+        run_concept_analysis_module.main()
         return
     
     # Load configuration

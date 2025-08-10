@@ -17,8 +17,14 @@ def main():
     
     try:
         # Import and run the concept analysis
-        from experiments.run_concept_analysis import main as run_concept_analysis
-        run_concept_analysis()
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "run_concept_analysis", 
+            os.path.join(project_root, "experiments", "run_concept_analysis.py")
+        )
+        run_concept_analysis_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(run_concept_analysis_module)
+        run_concept_analysis_module.main()
     except ImportError as e:
         print(f"❌ Import error: {e}")
         print("Make sure you're in the correct directory and all dependencies are installed.")

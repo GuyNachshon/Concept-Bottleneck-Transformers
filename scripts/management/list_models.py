@@ -8,8 +8,9 @@ import os
 import glob
 from datetime import datetime
 
-# Add the current directory to the path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add the project root directory to the path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, project_root)
 
 def find_all_results_dirs():
     """Find all experiment results directories."""

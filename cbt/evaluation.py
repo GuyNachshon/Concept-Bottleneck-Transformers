@@ -19,15 +19,16 @@ from .ablation_tools import ConceptAblator
 def get_wikitext_eval_texts(num_samples: int = 20) -> List[str]:
     """Get evaluation texts from WikiText dataset."""
     try:
-        # Load WikiText dataset
-        dataset = load_dataset("salesforce/wikitext", "wikitext-2-raw-v1", split="validation")
+        # Load WikiText dataset - use TEST split to avoid contamination with training data
+        dataset = load_dataset("salesforce/wikitext", "wikitext-2-raw-v1", split="test")
         
         # Filter and sample texts
         eval_texts = []
         for item in dataset:
             text = item['text'].strip()
             # Only use texts that are reasonable length and not empty
-            if len(text) > 10 and len(text) < 200 and text:
+            # Use longer texts for more realistic evaluation
+            if len(text) > 50 and len(text) < 1000 and text:
                 eval_texts.append(text)
                 if len(eval_texts) >= num_samples:
                     break
@@ -67,16 +68,46 @@ class CBTEvaluator:
         self.cbt_model.eval()
         self.base_model.eval()
     
+    def check_baseline_perplexity(self, eval_texts: List[str]) -> Dict[str, float]:
+        """Check baseline GPT-2 perplexity on the same evaluation texts."""
+        print("Checking baseline GPT-2 perplexity...")
+        
+        base_losses = []
+        
+        with torch.no_grad():
+            for text in tqdm(eval_texts):
+                input_ids = self.tokenizer.encode(text, return_tensors='pt', 
+                                                truncation=True, max_length=256).to(self.device)
+                
+                base_outputs = self.base_model(input_ids=input_ids, labels=input_ids)
+                base_losses.append(base_outputs.loss.item())
+        
+        base_perplexity = np.exp(np.mean(base_losses))
+        
+        print(f"Baseline GPT-2 perplexity: {base_perplexity:.2f}")
+        print(f"Loss range: {min(base_losses):.4f} to {max(base_losses):.4f}")
+        
+        return {
+            "baseline_perplexity": base_perplexity,
+            "baseline_loss_mean": np.mean(base_losses),
+            "baseline_loss_std": np.std(base_losses),
+            "baseline_loss_range": [min(base_losses), max(base_losses)]
+        }
+
     def evaluate_quality(self, eval_texts: List[str]) -> Dict[str, float]:
         """Evaluate quality: ≤2% perplexity hit vs. baseline."""
         print("Evaluating quality...")
+        
+        # First check baseline perplexity
+        baseline_info = self.check_baseline_perplexity(eval_texts)
+        expected_baseline = baseline_info["baseline_perplexity"]
         
         cbt_losses, base_losses = [], []
         
         with torch.no_grad():
             for text in tqdm(eval_texts):
                 input_ids = self.tokenizer.encode(text, return_tensors='pt', 
-                                                truncation=True, max_length=128).to(self.device)
+                                                truncation=True, max_length=256).to(self.device)
                 
                 cbt_outputs = self.cbt_model(input_ids=input_ids, labels=input_ids)
                 base_outputs = self.base_model(input_ids=input_ids, labels=input_ids)
@@ -88,11 +119,23 @@ class CBTEvaluator:
         base_perplexity = np.exp(np.mean(base_losses))
         quality_hit = (cbt_perplexity - base_perplexity) / base_perplexity * 100
         
+        # Check for suspicious results
+        if base_perplexity < 50:
+            print(f"⚠️  WARNING: Very low baseline perplexity ({base_perplexity:.2f}) - possible data contamination or overly simple texts")
+        if cbt_perplexity < 50:
+            print(f"⚠️  WARNING: Very low CBT perplexity ({cbt_perplexity:.2f}) - possible memorization")
+        
+        print(f"CBT perplexity: {cbt_perplexity:.2f}")
+        print(f"Base perplexity: {base_perplexity:.2f}")
+        print(f"Quality hit: {quality_hit:.2f}%")
+        
         return {
             "cbt_perplexity": cbt_perplexity,
             "base_perplexity": base_perplexity,
             "quality_hit_percent": quality_hit,
-            "quality_criterion_met": quality_hit <= 2.0
+            "quality_criterion_met": quality_hit <= 2.0,
+            "baseline_check": baseline_info,
+            "suspicious_low_perplexity": base_perplexity < 50 or cbt_perplexity < 50
         }
     
     def evaluate_sparsity(self, eval_texts: List[str]) -> Dict[str, Any]:

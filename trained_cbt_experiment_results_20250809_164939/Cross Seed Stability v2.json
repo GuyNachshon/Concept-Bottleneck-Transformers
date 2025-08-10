@@ -1,0 +1,95 @@
+{
+  "seed_0": {
+    "quality": {
+      "cbt_perplexity": 199.81114065260462,
+      "base_perplexity": 339.7958199837537,
+      "quality_hit_percent": -41.1967043437562,
+      "quality_criterion_met": true
+    },
+    "sparsity": {
+      "overall_median_active_concepts": 1.0,
+      "overall_sparsity_criterion_met": true
+    },
+    "config": {
+      "name": "stab_kl_m32_k4_a30",
+      "concept_blocks": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "m": 32,
+      "k": 4
+    },
+    "alpha_schedule": [
+      0.0,
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.3
+    ]
+  },
+  "seed_1": {
+    "quality": {
+      "cbt_perplexity": 183.80382028433215,
+      "base_perplexity": 339.7958199837537,
+      "quality_hit_percent": -45.907568759050605,
+      "quality_criterion_met": true
+    },
+    "sparsity": {
+      "overall_median_active_concepts": 1.0,
+      "overall_sparsity_criterion_met": true
+    },
+    "config": {
+      "name": "stab_kl_m32_k4_a30",
+      "concept_blocks": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "m": 32,
+      "k": 4
+    },
+    "alpha_schedule": [
+      0.0,
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.3
+    ]
+  },
+  "seed_2": {
+    "quality": {
+      "cbt_perplexity": 191.93590575613723,
+      "base_perplexity": 339.7958199837537,
+      "quality_hit_percent": -43.51434171105634,
+      "quality_criterion_met": true
+    },
+    "sparsity": {
+      "overall_median_active_concepts": 1.0,
+      "overall_sparsity_criterion_met": true
+    },
+    "config": {
+      "name": "stab_kl_m32_k4_a30",
+      "concept_blocks": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "m": 32,
+      "k": 4
+    },
+    "alpha_schedule": [
+      0.0,
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.3
+    ]
+  }
+}

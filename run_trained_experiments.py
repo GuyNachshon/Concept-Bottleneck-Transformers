@@ -640,6 +640,49 @@ def run_trained_placement_study(device, results_dir):
     return placement_results
 
 
+def evaluate_trained_model(model, device, results_dir, config_name: str, eval_size: int = 500):
+    """Evaluate a trained CBT model."""
+    logger.info(f"Evaluating trained model: {config_name}")
+    
+    # Load base model for comparison
+    base_model = GPT2LMHeadModel.from_pretrained("gpt2")
+    base_model.to(device)
+    
+    # Get evaluation texts from WikiText TEST split (not validation to avoid contamination)
+    eval_texts = get_wikitext_eval_texts(num_samples=eval_size)
+    logger.info(f"Using {len(eval_texts)} evaluation texts from WikiText-2 test split")
+    
+    # Create evaluator
+    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    tokenizer.pad_token = tokenizer.eos_token
+    evaluator = CBTEvaluator(model, base_model, tokenizer, device)
+    
+    # Run evaluation
+    quality_results = evaluator.evaluate_quality(eval_texts)
+    sparsity_results = evaluator.evaluate_sparsity(eval_texts)
+    
+    # Check for suspicious results
+    if quality_results.get("suspicious_low_perplexity", False):
+        logger.warning(f"⚠️  SUSPICIOUS: Very low perplexity detected for {config_name}")
+        logger.warning(f"   Base perplexity: {quality_results['base_perplexity']:.2f}")
+        logger.warning(f"   CBT perplexity: {quality_results['cbt_perplexity']:.2f}")
+    
+    results = {
+        "quality": quality_results,
+        "sparsity": sparsity_results,
+        "config": config_name,
+        "alpha_schedule": getattr(model, "alpha_schedule", [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
+    }
+    
+    # Save results
+    results_path = os.path.join(results_dir, f"{config_name} Results.json")
+    with open(results_path, 'w') as f:
+        json.dump(_json_serializable(results), f, indent=2)
+    
+    logger.info(f"Results saved to {results_path}")
+    return results
+
+
 def main():
     """Run trained CBT experiments."""
     logger.info("=== TRAINED CBT EXPERIMENT RUNNER ===")
@@ -707,6 +750,36 @@ def main():
         logger.info(f"📁 All results saved to: {results_dir}/")
         logger.info(f"📊 Best configuration: {best_config}")
         logger.info(f"📊 Best quality hit: {best_score:.2f}%")
+        
+        # Evaluate the best model from stabilization runs
+        logger.info("=" * 60)
+        logger.info("EVALUATING BEST STABILIZATION MODEL")
+        logger.info("=" * 60)
+        
+        # Load the best model
+        best_model_path = os.path.join(results_dir, f"{best_config}_model.pt")
+        if os.path.exists(best_model_path):
+            best_model = CBTModel(
+                base_model_name="gpt2",
+                concept_blocks=stab_kl_results["concept_blocks"], # Use the best config from KL run
+                m=stab_kl_results["m"],
+                k=stab_kl_results["k"],
+                alpha=0.3  # Use the final alpha from training
+            )
+            checkpoint = torch.load(best_model_path, map_location=device)
+            best_model.load_state_dict(checkpoint['model_state_dict'])
+            best_model.to(device)
+            
+            # Evaluate with larger test set
+            final_results = evaluate_trained_model(
+                best_model, device, results_dir, "Final_Best_Model", eval_size=1000
+            )
+            
+            logger.info(f"Final evaluation complete:")
+            logger.info(f"  Quality hit: {final_results['quality']['quality_hit_percent']:.2f}%")
+            logger.info(f"  Median active concepts: {final_results['sparsity']['overall_median_active_concepts']:.1f}")
+        else:
+            logger.warning(f"Best model checkpoint not found at {best_model_path}")
         
         return True
         

@@ -1,0 +1,30 @@
+{
+  "quality": {
+    "cbt_perplexity": 203.80280617786516,
+    "base_perplexity": 339.7958199837537,
+    "quality_hit_percent": -40.021979614814164,
+    "quality_criterion_met": true
+  },
+  "sparsity": {
+    "overall_median_active_concepts": 1.0,
+    "overall_sparsity_criterion_met": true
+  },
+  "config": {
+    "name": "stab_kl_m32_k4",
+    "concept_blocks": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "m": 32,
+    "k": 4
+  },
+  "alpha_schedule": [
+    0.0,
+    0.05,
+    0.1,
+    0.15,
+    0.2
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "timestamp": "20250809_164939",
+  "device": "cuda",
+  "best_config": "stab_kl_m32_k4",
+  "best_score": -40.021979614814164,
+  "experiments": {
+    "stabilization_run": "completed",
+    "stabilization_run_kl": "completed",
+    "stabilization_run_kl_alpha30": "completed",
+    "cross_seed_stability_v2": "completed"
+  }
+}

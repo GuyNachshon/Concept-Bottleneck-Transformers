@@ -42,8 +42,10 @@ def find_latest_results_dir():
     # Pattern for experiment result directories
     patterns = [
         "trained_cbt_experiment_results_*",
-        "cbt_experiment_results_*",
-        "experiment_results_*"
+        "cbt_experiment_results_*", 
+        "experiment_results_*",
+        "results/experiments_*",  # New organized structure
+        "results/experiments/*"   # Alternative organized structure
     ]
     
     all_dirs = []

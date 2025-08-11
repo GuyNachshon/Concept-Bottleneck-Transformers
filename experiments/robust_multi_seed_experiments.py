@@ -201,9 +201,11 @@ class RobustExperimentRunner:
             )
             
             # Run training
+            # Ensure alpha_schedule values are floats
+            alpha_schedule = [float(x) for x in config.training.alpha_schedule]
             training_results = trainer.train(
                 num_epochs=config.training.num_epochs,
-                alpha_schedule=config.training.alpha_schedule,
+                alpha_schedule=alpha_schedule,
                 save_path=str(exp_dir / 'model.pt') if self.config.save_models else None
             )
             

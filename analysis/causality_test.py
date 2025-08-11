@@ -29,7 +29,22 @@ def load_model_and_results():
     
     # Load model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = torch.load(results_dir / model_file, map_location=device)
+    
+    # Load the saved state
+    saved_state = torch.load(results_dir / model_file, map_location=device)
+    
+    # Create model instance
+    model = CBTModel(
+        base_model_name="gpt2",
+        concept_blocks=[4, 5, 6, 7],
+        m=32,
+        k=4,
+        alpha=0.3
+    )
+    
+    # Load the state dict
+    model.load_state_dict(saved_state)
+    model.to(device)
     model.eval()
     
     # Load analysis results

@@ -137,7 +137,7 @@ class RobustExperimentRunner:
         model = CBTModel(
             base_model_name="gpt2",
             concept_blocks=config.model.concept_blocks,
-            d_model=config.model.d_model,
+            d_model=getattr(config.model, 'd_model', 768),  # Default to 768 if not present
             m=config.model.m,
             k=config.model.k,
             alpha=0.0  # Start with no concept influence

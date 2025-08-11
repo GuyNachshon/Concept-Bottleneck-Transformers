@@ -193,7 +193,7 @@ class RobustExperimentRunner:
                     "orthogonality_weight": float(config.advanced_losses.orthogonality_weight),
                     "stability_weight": float(config.advanced_losses.stability_weight),
                     "kl_weight": float(config.advanced_losses.kl_weight),
-                    "dropout_weight": float(config.advanced_losses.dropout_weight)
+                    "concept_dropout_weight": float(config.advanced_losses.dropout_weight)
                 } if config.advanced_losses.enabled else None,
                 gradient_clip_max_norm=float(config.training.gradient_clip_max_norm),
                 use_mixed_precision=config.training.use_mixed_precision,

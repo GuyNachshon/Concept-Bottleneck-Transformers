@@ -115,11 +115,12 @@ def evaluate_perplexity(model, tokenizer, num_texts=50):
     
     eval_texts = get_wikitext_eval_texts(num_texts)
     losses = []
+    device = next(model.parameters()).device
     
     with torch.no_grad():
         for text in eval_texts:
             input_ids = tokenizer.encode(text, return_tensors='pt', 
-                                       truncation=True, max_length=256).to(model.device)
+                                       truncation=True, max_length=256).to(device)
             
             outputs = model(input_ids=input_ids, labels=input_ids)
             losses.append(outputs["loss"].item())

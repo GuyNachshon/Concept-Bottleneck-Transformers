@@ -16,6 +16,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from concurrent.futures import ProcessPoolExecutor
 import logging
+from torch.utils.data import DataLoader, Dataset
+from transformers import GPT2Tokenizer
+from datasets import load_dataset
 
 # Import CBT modules
 import sys
@@ -24,6 +27,50 @@ from cbt.config import CBTConfig, load_config
 from cbt.trainer import CBTTrainer
 from cbt.evaluator import CBTEvaluator
 from cbt.analyzer import ConceptAnalyzer
+from cbt.model import CBTModel
+
+
+class WikiTextDataset(Dataset):
+    """Dataset wrapper for WikiText."""
+    
+    def __init__(self, dataset, tokenizer, max_length=128):
+        self.dataset = dataset
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+        
+        # Tokenize all texts
+        self.tokenized_texts = []
+        for item in dataset:
+            text = item['text']
+            if text.strip():  # Skip empty texts
+                tokens = self.tokenizer.encode(
+                    text, 
+                    truncation=True, 
+                    max_length=self.max_length,
+                    return_tensors='pt'
+                )
+                if tokens.size(1) > 1:  # Skip single-token texts
+                    self.tokenized_texts.append(tokens)
+    
+    def __len__(self):
+        return len(self.tokenized_texts)
+    
+    def __getitem__(self, idx):
+        tokens = self.tokenized_texts[idx]
+        return {
+            "input_ids": tokens.squeeze(0),
+            "attention_mask": torch.ones_like(tokens.squeeze(0))
+        }
+
+
+def collate_fn(batch):
+    """Collate function for DataLoader."""
+    input_ids = torch.stack([item['input_ids'] for item in batch])
+    attention_mask = torch.stack([item['attention_mask'] for item in batch])
+    return {
+        'input_ids': input_ids,
+        'attention_mask': attention_mask
+    }
 
 
 @dataclass
@@ -55,6 +102,49 @@ class RobustExperimentRunner:
         )
         self.logger = logging.getLogger(__name__)
         
+    def setup_data_and_model(self, config: CBTConfig):
+        """Setup data loaders and model for training"""
+        # Load dataset
+        dataset = load_dataset("salesforce/wikitext", "wikitext-2-raw-v1", split="train")
+        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        tokenizer.pad_token = tokenizer.eos_token
+        
+        # Create dataset wrapper
+        train_dataset = WikiTextDataset(dataset, tokenizer, max_length=128)
+        
+        # Create validation dataset (use a subset)
+        val_size = min(500, len(train_dataset) // 20)
+        val_dataset = torch.utils.data.Subset(train_dataset, range(val_size))
+        
+        # Create dataloaders
+        train_dataloader = DataLoader(
+            train_dataset, 
+            batch_size=4, 
+            shuffle=True, 
+            collate_fn=collate_fn,
+            num_workers=0
+        )
+        
+        val_dataloader = DataLoader(
+            val_dataset, 
+            batch_size=4, 
+            shuffle=False, 
+            collate_fn=collate_fn,
+            num_workers=0
+        )
+        
+        # Create CBT model
+        model = CBTModel(
+            base_model_name="gpt2",
+            concept_blocks=config.model.concept_blocks,
+            d_model=config.model.d_model,
+            m=config.model.m,
+            k=config.model.k,
+            alpha=0.0  # Start with no concept influence
+        )
+        
+        return model, train_dataloader, val_dataloader
+        
     def run_single_seed(self, seed: int) -> Dict[str, Any]:
         """Run a single experiment with given seed"""
         self.logger.info(f"Starting experiment with seed {seed}")
@@ -85,9 +175,37 @@ class RobustExperimentRunner:
         exp_dir.mkdir(exist_ok=True)
         
         try:
+            # Setup data and model
+            model, train_dataloader, val_dataloader = self.setup_data_and_model(config)
+            
+            # Create trainer with proper arguments
+            trainer = CBTTrainer(
+                model=model,
+                train_dataloader=train_dataloader,
+                val_dataloader=val_dataloader,
+                learning_rate=config.training.learning_rate,
+                weight_decay=0.01,  # Default weight decay
+                device=config.get_device(),
+                use_wandb=config.logging.use_wandb,
+                project_name="cbt-robust-experiments",  # Default project name
+                use_advanced_losses=config.advanced_losses.enabled,
+                advanced_loss_config={
+                    "orthogonality_weight": config.advanced_losses.orthogonality_weight,
+                    "stability_weight": config.advanced_losses.stability_weight,
+                    "kl_weight": config.advanced_losses.kl_weight,
+                    "dropout_weight": config.advanced_losses.dropout_weight
+                } if config.advanced_losses.enabled else None,
+                gradient_clip_max_norm=config.training.gradient_clip_max_norm,
+                use_mixed_precision=config.training.use_mixed_precision,
+                freeze_base_until_alpha=config.training.freeze_base_until_alpha
+            )
+            
             # Run training
-            trainer = CBTTrainer(config)
-            training_results = trainer.train()
+            training_results = trainer.train(
+                num_epochs=config.training.num_epochs,
+                alpha_schedule=config.training.alpha_schedule,
+                save_path=str(exp_dir / 'model.pt') if self.config.save_models else None
+            )
             
             # Run evaluation
             evaluator = CBTEvaluator(config)
@@ -109,10 +227,6 @@ class RobustExperimentRunner:
             # Save results
             with open(exp_dir / 'results.json', 'w') as f:
                 json.dump(results, f, indent=2, default=str)
-            
-            # Save model if requested
-            if self.config.save_models:
-                trainer.save_model(exp_dir / 'model.pt')
             
             self.logger.info(f"Completed experiment with seed {seed}")
             return results
@@ -165,7 +279,13 @@ class RobustExperimentRunner:
         
         if len(successful_results) < 3:
             self.logger.warning("Insufficient successful runs for statistical analysis")
-            return {'error': 'Insufficient successful runs'}
+            return {
+                'total_runs': len(results),
+                'successful_runs': len(successful_results),
+                'failed_runs': len(failed_results),
+                'success_rate': len(successful_results) / len(results) if results else 0.0,
+                'error': 'Insufficient successful runs'
+            }
         
         # Extract key metrics
         metrics = {
@@ -367,11 +487,19 @@ def main():
     print("\n" + "="*60)
     print("ROBUST EXPERIMENT RESULTS")
     print("="*60)
-    print(f"Total runs: {analysis['total_runs']}")
-    print(f"Successful runs: {analysis['successful_runs']}")
-    print(f"Success rate: {analysis['success_rate']:.1%}")
     
-    if 'metrics' in analysis:
+    # Handle case where analysis might not have expected keys
+    total_runs = analysis.get('total_runs', 0)
+    successful_runs = analysis.get('successful_runs', 0)
+    success_rate = analysis.get('success_rate', 0.0)
+    
+    print(f"Total runs: {total_runs}")
+    print(f"Successful runs: {successful_runs}")
+    print(f"Success rate: {success_rate:.1%}")
+    
+    if 'error' in analysis:
+        print(f"\nAnalysis error: {analysis['error']}")
+    elif 'metrics' in analysis:
         print("\nKey Metrics (mean ± std):")
         for metric, stats in analysis['metrics'].items():
             ci_95 = stats['confidence_interval_95']

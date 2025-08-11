@@ -5,6 +5,7 @@
 model:
   base_model_name: "gpt2"
   concept_blocks: [4, 5, 6, 7]  # Which transformer blocks to insert concepts into
+  d_model: 768                  # Model dimension
   m: 32                         # Number of concepts per block
   k: 4                          # Number of active concepts per token
   alpha: 0.2                    # Bypass mixing coefficient

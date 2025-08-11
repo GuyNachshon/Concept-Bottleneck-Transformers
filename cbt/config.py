@@ -14,6 +14,7 @@ class ModelConfig:
     """Model configuration parameters."""
     base_model_name: str = "gpt2"
     concept_blocks: list = field(default_factory=lambda: [4, 5, 6, 7])
+    d_model: int = 768
     m: int = 32
     k: int = 4
     alpha: float = 0.2

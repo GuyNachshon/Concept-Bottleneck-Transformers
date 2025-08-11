@@ -245,7 +245,8 @@ class CBTDomainTester:
                 # Identify which concepts are most active
                 block_activations = activations[block_name]
                 active_concepts = []
-                for concept_idx in range(block_activations.shape[-1]):
+                num_concepts = block_activations.shape[-1]
+                for concept_idx in range(num_concepts):
                     max_activation = np.max(block_activations[:, concept_idx])
                     if max_activation > 0.1:
                         concept_key = f"{block_name}_{concept_idx}"

@@ -30,8 +30,8 @@ def load_model_and_results():
     # Load model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # Load the saved state
-    saved_state = torch.load(results_dir / model_file, map_location=device)
+    # Load the saved checkpoint
+    checkpoint = torch.load(results_dir / model_file, map_location=device)
     
     # Create model instance
     model = CBTModel(
@@ -42,8 +42,8 @@ def load_model_and_results():
         alpha=0.3
     )
     
-    # Load the state dict
-    model.load_state_dict(saved_state)
+    # Load the state dict from checkpoint
+    model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
     model.eval()
     

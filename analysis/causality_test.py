@@ -102,9 +102,9 @@ def ablate_concept(model, block_name, concept_idx):
     
     with torch.no_grad():
         # Zero out the concept encoder weights for this concept
-        concept_layer.concept_encoder.weight[concept_idx] = 0.0
-        if concept_layer.concept_encoder.bias is not None:
-            concept_layer.concept_encoder.bias[concept_idx] = 0.0
+        concept_layer.encoder.weight[concept_idx] = 0.0
+        if concept_layer.encoder.bias is not None:
+            concept_layer.encoder.bias[concept_idx] = 0.0
     
     return ablated_model
 

@@ -64,9 +64,36 @@ class WikiTextDataset(Dataset):
 
 
 def collate_fn(batch):
-    """Collate function for DataLoader."""
-    input_ids = torch.stack([item['input_ids'] for item in batch])
-    attention_mask = torch.stack([item['attention_mask'] for item in batch])
+    """Collate function for DataLoader with padding."""
+    # Find the maximum length in this batch
+    max_length = max(item['input_ids'].size(0) for item in batch)
+    
+    # Pad sequences to the same length
+    padded_input_ids = []
+    padded_attention_mask = []
+    
+    for item in batch:
+        input_ids = item['input_ids']
+        attention_mask = item['attention_mask']
+        
+        # Calculate padding length
+        pad_length = max_length - input_ids.size(0)
+        
+        if pad_length > 0:
+            # Pad with tokenizer's pad token ID (usually 50256 for GPT-2)
+            padded_input = torch.cat([input_ids, torch.full((pad_length,), 50256, dtype=input_ids.dtype)])
+            padded_mask = torch.cat([attention_mask, torch.zeros(pad_length, dtype=attention_mask.dtype)])
+        else:
+            padded_input = input_ids
+            padded_mask = attention_mask
+        
+        padded_input_ids.append(padded_input)
+        padded_attention_mask.append(padded_mask)
+    
+    # Stack the padded tensors
+    input_ids = torch.stack(padded_input_ids)
+    attention_mask = torch.stack(padded_attention_mask)
+    
     return {
         'input_ids': input_ids,
         'attention_mask': attention_mask

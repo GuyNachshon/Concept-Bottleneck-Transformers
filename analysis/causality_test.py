@@ -152,7 +152,7 @@ def test_concept_causality(model, tokenizer, evaluator, top_concepts, num_texts=
         )
         
         # Measure perplexity
-        ablated_perplexity = evaluator.evaluate_perplexity(ablated_model, num_texts=num_texts)
+        ablated_perplexity = evaluate_perplexity(ablated_model, tokenizer, num_texts=num_texts)
         perplexity_change = ablated_perplexity - baseline_perplexity
         percent_change = (perplexity_change / baseline_perplexity) * 100
         

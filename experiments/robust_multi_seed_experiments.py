@@ -183,21 +183,21 @@ class RobustExperimentRunner:
                 model=model,
                 train_dataloader=train_dataloader,
                 val_dataloader=val_dataloader,
-                learning_rate=config.training.learning_rate,
+                learning_rate=float(config.training.learning_rate),
                 weight_decay=0.01,  # Default weight decay
                 device=config.get_device(),
                 use_wandb=config.logging.use_wandb,
                 project_name="cbt-robust-experiments",  # Default project name
                 use_advanced_losses=config.advanced_losses.enabled,
                 advanced_loss_config={
-                    "orthogonality_weight": config.advanced_losses.orthogonality_weight,
-                    "stability_weight": config.advanced_losses.stability_weight,
-                    "kl_weight": config.advanced_losses.kl_weight,
-                    "dropout_weight": config.advanced_losses.dropout_weight
+                    "orthogonality_weight": float(config.advanced_losses.orthogonality_weight),
+                    "stability_weight": float(config.advanced_losses.stability_weight),
+                    "kl_weight": float(config.advanced_losses.kl_weight),
+                    "dropout_weight": float(config.advanced_losses.dropout_weight)
                 } if config.advanced_losses.enabled else None,
-                gradient_clip_max_norm=config.training.gradient_clip_max_norm,
+                gradient_clip_max_norm=float(config.training.gradient_clip_max_norm),
                 use_mixed_precision=config.training.use_mixed_precision,
-                freeze_base_until_alpha=config.training.freeze_base_until_alpha
+                freeze_base_until_alpha=float(config.training.freeze_base_until_alpha)
             )
             
             # Run training

@@ -86,7 +86,7 @@ def ablate_concept(model, block_name, concept_idx):
     """Create a copy of the model with a specific concept ablated."""
     # Create a copy of the model
     ablated_model = type(model)(
-        base_model_name=model.base_model_name,
+        base_model_name="gpt2",
         concept_blocks=model.concept_blocks,
         m=model.m,
         k=model.k,

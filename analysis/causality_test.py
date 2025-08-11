@@ -98,8 +98,7 @@ def ablate_concept(model, block_name, concept_idx):
     ablated_model.eval()
     
     # Zero out the specific concept
-    block_idx = int(block_name.split('_')[1])
-    concept_layer = ablated_model.concept_layers[block_idx]
+    concept_layer = ablated_model.concept_layers[block_name]
     
     with torch.no_grad():
         # Zero out the concept encoder weights for this concept

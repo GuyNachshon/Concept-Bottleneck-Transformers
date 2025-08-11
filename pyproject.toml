@@ -21,6 +21,7 @@ dependencies = [
     "requests>=2.28.0",
     "python-dotenv",
     "datasets>=2.14.0",
+    "plotly>=6.2.0",
 ]
 
 [build-system]

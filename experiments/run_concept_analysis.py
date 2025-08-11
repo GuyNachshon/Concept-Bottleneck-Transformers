@@ -551,6 +551,7 @@ def main():
         'metadata': analysis_metadata,
         'specialization': specialization,
         'concept_labels': concept_labels,
+        'concept_contexts': concept_contexts,  # Save the actual contexts!
         'causality_results': causality_results,
         'text_categories': {
             cat: len(texts) for cat, texts in text_categories.items()

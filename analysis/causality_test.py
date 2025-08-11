@@ -109,6 +109,24 @@ def ablate_concept(model, block_name, concept_idx):
     
     return ablated_model
 
+def evaluate_perplexity(model, tokenizer, num_texts=50):
+    """Evaluate perplexity on a set of texts."""
+    from cbt.evaluator import get_wikitext_eval_texts
+    
+    eval_texts = get_wikitext_eval_texts(num_texts)
+    losses = []
+    
+    with torch.no_grad():
+        for text in eval_texts:
+            input_ids = tokenizer.encode(text, return_tensors='pt', 
+                                       truncation=True, max_length=256).to(model.device)
+            
+            outputs = model(input_ids=input_ids, labels=input_ids)
+            losses.append(outputs["loss"].item())
+    
+    perplexity = np.exp(np.mean(losses))
+    return perplexity
+
 def test_concept_causality(model, tokenizer, evaluator, top_concepts, num_texts=50):
     """Test causality by ablating concepts and measuring perplexity changes."""
     print("🧪 TESTING CONCEPT CAUSALITY")
@@ -116,7 +134,7 @@ def test_concept_causality(model, tokenizer, evaluator, top_concepts, num_texts=
     
     # Get baseline perplexity
     print("📊 Computing baseline perplexity...")
-    baseline_perplexity = evaluator.evaluate_perplexity(model, num_texts=num_texts)
+    baseline_perplexity = evaluate_perplexity(model, tokenizer, num_texts=num_texts)
     print(f"Baseline perplexity: {baseline_perplexity:.3f}")
     
     # Test each top concept

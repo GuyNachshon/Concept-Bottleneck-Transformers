@@ -7,7 +7,7 @@ import json
 import torch
 import numpy as np
 from pathlib import Path
-from transformers import GPT2Tokenizer
+from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import sys
 import os
 
@@ -194,11 +194,14 @@ def main():
     print(f"✅ Loaded model: {type(model).__name__}")
     print(f"✅ Loaded analysis results")
     
-    # Setup tokenizer and evaluator
+    # Setup tokenizer and base model
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     tokenizer.pad_token = tokenizer.eos_token
     
-    evaluator = CBTEvaluator(tokenizer)
+    base_model = GPT2LMHeadModel.from_pretrained("gpt2")
+    base_model.eval()
+    
+    evaluator = CBTEvaluator(model, base_model, tokenizer)
     
     # Get top concepts
     top_concepts = get_top_concepts(results, top_k=10)

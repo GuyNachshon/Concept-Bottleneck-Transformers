@@ -245,17 +245,24 @@ class CBTDomainTester:
                 # Identify which concepts are most active
                 block_activations = activations[block_name]
                 active_concepts = []
+                # Debug: print shape to understand the issue
+                print(f"      Block {block_name} activations shape: {block_activations.shape}")
                 num_concepts = block_activations.shape[-1]
                 for concept_idx in range(num_concepts):
-                    max_activation = np.max(block_activations[:, concept_idx])
-                    if max_activation > 0.1:
-                        concept_key = f"{block_name}_{concept_idx}"
-                        concept_label = self.concept_labels.get(concept_key, f"concept_{concept_idx}")
-                        active_concepts.append({
-                            'concept_idx': concept_idx,
-                            'concept_label': concept_label,
-                            'max_activation': float(max_activation)
-                        })
+                    try:
+                        max_activation = np.max(block_activations[:, concept_idx])
+                        if max_activation > 0.1:
+                            concept_key = f"{block_name}_{concept_idx}"
+                            concept_label = self.concept_labels.get(concept_key, f"concept_{concept_idx}")
+                            active_concepts.append({
+                                'concept_idx': concept_idx,
+                                'concept_label': concept_label,
+                                'max_activation': float(max_activation)
+                            })
+                    except IndexError as e:
+                        print(f"      IndexError for concept_idx {concept_idx}: {e}")
+                        print(f"      Block activations shape: {block_activations.shape}")
+                        break
                 
                 # Sort by activation strength
                 active_concepts.sort(key=lambda x: x['max_activation'], reverse=True)

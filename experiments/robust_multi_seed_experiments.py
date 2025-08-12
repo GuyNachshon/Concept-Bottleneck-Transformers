@@ -237,12 +237,37 @@ class RobustExperimentRunner:
             )
             
             # Run evaluation
-            evaluator = CBTEvaluator(config)
+            # Create base model and tokenizer for evaluation
+            from transformers import GPT2LMHeadModel
+            base_model = GPT2LMHeadModel.from_pretrained("gpt2")
+            tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+            tokenizer.pad_token = tokenizer.eos_token
+            
+            evaluator = CBTEvaluator(
+                cbt_model=model,
+                base_model=base_model,
+                tokenizer=tokenizer,
+                device=config.get_device()
+            )
             eval_results = evaluator.evaluate()
             
             # Run concept analysis
-            analyzer = ConceptAnalyzer(config)
-            analysis_results = analyzer.analyze_concepts()
+            analyzer = ConceptAnalyzer(
+                model=model,
+                tokenizer=tokenizer,
+                device=config.get_device(),
+                use_llm_labeling=False  # Disable LLM labeling for faster execution
+            )
+            # Create a simple dataloader for analysis
+            analysis_dataset = torch.utils.data.Subset(train_dataset, range(min(100, len(train_dataset))))
+            analysis_dataloader = DataLoader(
+                analysis_dataset,
+                batch_size=4,
+                shuffle=False,
+                collate_fn=collate_fn,
+                num_workers=0
+            )
+            analysis_results = analyzer.analyze_concepts(analysis_dataloader, max_samples=50)
             
             # Combine results
             results = {

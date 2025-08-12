@@ -250,7 +250,20 @@ class RobustExperimentRunner:
                 tokenizer=tokenizer,
                 device=config.get_device()
             )
-            eval_results = evaluator.evaluate()
+            
+            # Load evaluation dataset
+            eval_dataset = load_dataset("salesforce/wikitext", "wikitext-2-raw-v1", split="validation")
+            
+            # Create evaluation texts from the validation set
+            eval_texts = []
+            for item in eval_dataset:
+                text = item['text'].strip()
+                if text and len(text) > 20:  # Only use non-empty texts with reasonable length
+                    eval_texts.append(text)
+                    if len(eval_texts) >= 100:  # Limit to 100 evaluation texts
+                        break
+            
+            eval_results = evaluator.evaluate_all_criteria(eval_texts)
             
             # Run concept analysis
             analyzer = ConceptAnalyzer(

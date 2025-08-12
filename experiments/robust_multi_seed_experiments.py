@@ -130,7 +130,10 @@ class RobustExperimentRunner:
         self.logger = logging.getLogger(__name__)
         
     def setup_data_and_model(self, config: CBTConfig):
-        """Setup data loaders and model for training"""
+        """Setup data loaders and model for training.
+
+        Returns a tuple of (model, train_dataloader, val_dataloader, train_dataset, tokenizer).
+        """
         # Load dataset
         dataset = load_dataset("salesforce/wikitext", "wikitext-2-raw-v1", split="train")
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -170,7 +173,7 @@ class RobustExperimentRunner:
             alpha=0.0  # Start with no concept influence
         )
         
-        return model, train_dataloader, val_dataloader
+        return model, train_dataloader, val_dataloader, train_dataset, tokenizer
         
     def run_single_seed(self, seed: int) -> Dict[str, Any]:
         """Run a single experiment with given seed"""
@@ -203,7 +206,7 @@ class RobustExperimentRunner:
         
         try:
             # Setup data and model
-            model, train_dataloader, val_dataloader = self.setup_data_and_model(config)
+            model, train_dataloader, val_dataloader, train_dataset, tokenizer = self.setup_data_and_model(config)
             
             # Create trainer with proper arguments
             trainer = CBTTrainer(
@@ -237,11 +240,9 @@ class RobustExperimentRunner:
             )
             
             # Run evaluation
-            # Create base model and tokenizer for evaluation
+            # Create base model for evaluation (reuse tokenizer from setup)
             from transformers import GPT2LMHeadModel
             base_model = GPT2LMHeadModel.from_pretrained("gpt2")
-            tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-            tokenizer.pad_token = tokenizer.eos_token
             
             evaluator = CBTEvaluator(
                 cbt_model=model,
@@ -258,7 +259,7 @@ class RobustExperimentRunner:
                 device=config.get_device(),
                 use_llm_labeling=False  # Disable LLM labeling for faster execution
             )
-            # Create a simple dataloader for analysis
+            # Create a simple dataloader for analysis using a small subset of the train dataset
             analysis_dataset = torch.utils.data.Subset(train_dataset, range(min(100, len(train_dataset))))
             analysis_dataloader = DataLoader(
                 analysis_dataset,

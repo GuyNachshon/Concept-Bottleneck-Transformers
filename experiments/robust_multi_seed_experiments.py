@@ -265,23 +265,27 @@ class RobustExperimentRunner:
             
             eval_results = evaluator.evaluate_all_criteria(eval_texts)
             
-            # Run concept analysis
-            analyzer = ConceptAnalyzer(
-                model=model,
-                tokenizer=tokenizer,
-                device=config.get_device(),
-                use_llm_labeling=False  # Disable LLM labeling for faster execution
-            )
-            # Create a simple dataloader for analysis using a small subset of the train dataset
-            analysis_dataset = torch.utils.data.Subset(train_dataset, range(min(100, len(train_dataset))))
-            analysis_dataloader = DataLoader(
-                analysis_dataset,
-                batch_size=4,
-                shuffle=False,
-                collate_fn=collate_fn,
-                num_workers=0
-            )
-            analysis_results = analyzer.analyze_concepts(analysis_dataloader, max_samples=50)
+            # Run concept analysis (simplified for now)
+            try:
+                analyzer = ConceptAnalyzer(
+                    model=model,
+                    tokenizer=tokenizer,
+                    device=config.get_device(),
+                    use_llm_labeling=False  # Disable LLM labeling for faster execution
+                )
+                # Create a simple dataloader for analysis using a small subset of the train dataset
+                analysis_dataset = torch.utils.data.Subset(train_dataset, range(min(100, len(train_dataset))))
+                analysis_dataloader = DataLoader(
+                    analysis_dataset,
+                    batch_size=4,
+                    shuffle=False,
+                    collate_fn=collate_fn,
+                    num_workers=0
+                )
+                analysis_results = analyzer.analyze_concepts(analysis_dataloader, max_samples=50)
+            except Exception as e:
+                self.logger.warning(f"Concept analysis failed for seed {seed}: {e}")
+                analysis_results = {"error": str(e), "status": "failed"}
             
             # Combine results
             results = {
